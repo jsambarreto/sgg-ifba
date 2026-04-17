@@ -10,7 +10,7 @@ services:
     env_file:
       - .env      # Lê o seu arquivo com as senhas de e-mail
     volumes:
-      - sqlite_data:/app/db.sqlite3 # Salva o banco de dados fora do container para não perder os cadastros
+      - sqlite_data:/app/data
 
 volumes:
   sqlite_data:

@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = config('SECRET_KEY', default='algumacoisa')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -79,7 +79,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'data' / 'db.sqlite3',
     }
 }
 
@@ -124,8 +124,8 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 465
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = True
-EMAIL_HOST_USER = config('EMAIL_DO_SISTEMA') # Substitua pelo email institucional
-EMAIL_HOST_PASSWORD = config('SENHA_DO_EMAIL') # Use uma senha de app, não a senha real
+EMAIL_HOST_USER = config('EMAIL_DO_SISTEMA', default='algumacoisa@email.com') # Substitua pelo email institucional
+EMAIL_HOST_PASSWORD = config('SENHA_DO_EMAIL', default='algumacoisa') # Use uma senha de app, não a senha real
 DEFAULT_FROM_EMAIL = f"Gestão de Grades IFBA <{EMAIL_HOST_USER}>"
 # Redirecionamentos de Login/Logout
 LOGIN_REDIRECT_URL = '/'        # Vai para a página inicial após logar
