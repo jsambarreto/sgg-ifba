@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j*^w^24^*w^dz4btgx4u2zk%g_n+$irla5*d!f=pa+g*qupug+'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -121,9 +122,9 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 465
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'informatica.euc@ifba.edu.br' # Substitua pelo email institucional
-EMAIL_HOST_PASSWORD = 'brmq mvfk xgvc xhmb' # Use uma senha de app, não a senha real
-DEFAULT_FROM_EMAIL = 'Sistema de Grade IFBA <informatica.euc@ifba.edu.br>'
+EMAIL_HOST_USER = config('EMAIL_DO_SISTEMA') # Substitua pelo email institucional
+EMAIL_HOST_PASSWORD = config('SENHA_DO_EMAIL') # Use uma senha de app, não a senha real
+DEFAULT_FROM_EMAIL = f"Gestão de Grades IFBA <{EMAIL_HOST_USER}>"
 # Redirecionamentos de Login/Logout
 LOGIN_REDIRECT_URL = '/'        # Vai para a página inicial após logar
 LOGOUT_REDIRECT_URL = '/login/' # Volta para a tela de login após sair
