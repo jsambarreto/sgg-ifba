@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Carga Horária - IFBA</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8f9fa; padding: 20px; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .btn-voltar { text-decoration: none; padding: 8px 15px; background: #95a5a6; color: white; border-radius: 4px; font-weight: bold; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        
+        .tabela-dashboard { width: 100%; border-collapse: collapse; }
+        .tabela-dashboard th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #7f8c8d; }
+        .tabela-dashboard td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        
+        /* Estilos da Barra de Progresso */
+        .barra-fundo { width: 100%; background: #ecf0f1; border-radius: 10px; height: 12px; overflow: hidden; margin-top: 5px; }
+        .barra-preenchimento { height: 100%; border-radius: 10px; transition: width 0.5s; }
+        
+        /* Cores baseadas na carga horária (exemplo baseado em 20h como limite) */
+        .carga-alta { background: #e74c3c; } /* Vermelho */
+        .carga-media { background: #3498db; } /* Azul */
+        .carga-baixa { background: #f1c40f; } /* Amarelo */
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>📊 Painel da Direção: Carga Horária Docente</h2>
+        <a href="/" class="btn-voltar">⬅️ Voltar ao Início</a>
+    </div>
+
+    <div class="card">
+        <table class="tabela-dashboard">
+            <thead>
+                <tr>
+                    <th>Professor</th>
+                    <th style="width: 15%;">Total de Aulas</th>
+                    <th style="width: 40%;">Nível de Ocupação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prof in professores %}
+                <tr>
+                    <td><strong>{{ prof.nome_completo }}</strong></td>
+                    <td style="font-size: 1.2em; font-weight: bold;">{{ prof.total_aulas }}</td>
+                    <td>
+                        {% widthratio prof.total_aulas 20 100 as porcentagem %}
+                        
+                        <div class="barra-fundo">
+                            <div class="barra-preenchimento 
+                                {% if prof.total_aulas >= 16 %}carga-alta
+                                {% elif prof.total_aulas >= 8 %}carga-media
+                                {% else %}carga-baixa{% endif %}" 
+                                style="width: {% if prof.total_aulas > 20 %}100{% else %}{{ porcentagem }}{% endif %}%;">
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: #7f8c8d;">Nenhuma aula cadastrada na base de dados ainda.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>

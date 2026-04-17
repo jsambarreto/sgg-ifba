@@ -1,0 +1,130 @@
+{% extends 'gestao/base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<style>
+    .abas-nav { display: flex; border-bottom: 2px solid #ecf0f1; margin-bottom: 25px; }
+    .aba-btn { padding: 12px 25px; text-decoration: none; font-weight: bold; color: #7f8c8d; border-bottom: 3px solid transparent; transition: 0.3s; margin-bottom: -2px; }
+    .aba-btn:hover { color: #2c3e50; }
+    .aba-btn.ativa { color: #2ecc71; border-bottom-color: #2ecc71; }
+    
+    .card-aula { background: #e8f8f5; border: 1px solid #1abc9c; padding: 10px; border-radius: 4px; font-size: 0.85em; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(26, 188, 156, 0.2); }
+    .card-aula:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(26, 188, 156, 0.3); }
+    
+    .card-colega { background: #f8f9fa; border: 1px dashed #bdc3c7; padding: 10px; border-radius: 4px; font-size: 0.85em; color: #7f8c8d; }
+</style>
+
+<div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <h2 style="color: #2c3e50; margin-bottom: 20px;">📅 Grade Horária</h2>
+
+    <div class="abas-nav">
+        <a href="?aba=pessoal" class="aba-btn {% if aba_ativa == 'pessoal' %}ativa{% endif %}">👤 Minhas Aulas</a>
+        <a href="?aba=turma" class="aba-btn {% if aba_ativa == 'turma' %}ativa{% endif %}">🏫 Visão da Turma (Permutas)</a>
+    </div>
+
+    {% if aba_ativa == 'turma' %}
+        <div style="background: #fdfefe; padding: 15px; border-radius: 6px; border: 1px solid #eee; margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+            <form method="GET" style="display: flex; gap: 15px; align-items: center; width: 100%;">
+                <input type="hidden" name="aba" value="turma">
+                <label for="turma" style="font-weight: bold; color: #2c3e50;">Selecione a Turma para analisar:</label>
+                <select name="turma" id="turma" required style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; flex-grow: 1; max-width: 400px;">
+                    <option value="">-- Escolha uma das suas turmas --</option>
+                    {% for t in turmas_do_prof %}
+                        <option value="{{ t.id }}" {% if turma_selecionada.id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Carregar Grelha</button>
+            </form>
+        </div>
+
+        {% if not turma_selecionada %}
+            <div style="text-align: center; padding: 40px; color: #7f8c8d;">Selecione uma turma acima para ver os horários dos seus colegas e planear permutas.</div>
+        {% endif %}
+    {% endif %}
+
+    {% if aba_ativa == 'pessoal' or turma_selecionada %}
+        <table style="width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px;">
+            <thead style="background-color: #2c3e50; color: white;">
+                <tr>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Horário</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Segunda</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Terça</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Quarta</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Quinta</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Sexta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hora in slots_horarios %}
+                <tr>
+                    <td style="padding: 15px; border: 1px solid #bdc3c7; font-weight: bold; background: #ecf0f1;">{{ hora }}</td>
+                    {% for dia in dias_semana %}
+                        <td style="padding: 8px; border: 1px solid #bdc3c7; background: #fff; width: 18%; vertical-align: top;">
+                            {% with chave=dia|stringformat:"s"|add:"-"|add:hora %}
+                                
+                                {% if aba_ativa == 'pessoal' %}
+                                    {% if chave in grade_pessoal_map %}
+                                        <div class="card-aula" onclick="abrirAcaoAula('{{ grade_pessoal_map|get_item:chave|get_item:'id' }}', '{{ grade_pessoal_map|get_item:chave|get_item:'disciplina' }}', '{{ grade_pessoal_map|get_item:chave|get_item:'turma' }}')">
+                                            <strong style="display: block; color: #16a085;">{{ grade_pessoal_map|get_item:chave|get_item:'disciplina' }}</strong>
+                                            <span style="color: #2c3e50;">{{ grade_pessoal_map|get_item:chave|get_item:'turma' }}</span>
+                                        </div>
+                                    {% endif %}
+                                
+                                {% elif aba_ativa == 'turma' and chave in grade_turma_map %}
+                                    {% if grade_turma_map|get_item:chave|get_item:'is_minha_aula' %}
+                                        <div class="card-aula" onclick="abrirAcaoAula('{{ grade_turma_map|get_item:chave|get_item:'id' }}', '{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}', '{{ turma_selecionada.nome }}')" title="Sua Aula - Clique para trocar">
+                                            <strong style="display: block; color: #16a085;">{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}</strong>
+                                            <span style="color: #2c3e50; font-size: 0.9em;">(Você)</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="card-colega" title="Aula de {{ grade_turma_map|get_item:chave|get_item:'professor' }}">
+                                            <strong style="display: block;">{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}</strong>
+                                            <span>{{ grade_turma_map|get_item:chave|get_item:'professor'|truncatechars:15 }}</span>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+
+                            {% endwith %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+<div id="modalAcao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+    <div style="background: white; padding: 25px; border-radius: 8px; width: 400px; text-align: center;">
+        <h3 id="modalTitulo" style="margin-top: 0; color: #2c3e50;">Ação para Aula</h3>
+        <p style="color: #7f8c8d; margin-bottom: 25px;">O que deseja fazer com este horário?</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button onclick="redirecionarSolicitacao('P')" style="padding: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 Solicitar Permuta</button>
+            <button onclick="redirecionarSolicitacao('S')" style="padding: 12px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">👤 Solicitar Substituição</button>
+            <button onclick="fecharModal()" style="padding: 12px; background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let aulaSelecionadaId = null;
+
+    function abrirAcaoAula(aulaId, disciplina, turma) {
+        aulaSelecionadaId = aulaId;
+        document.getElementById('modalTitulo').innerText = disciplina + ' - ' + turma;
+        document.getElementById('modalAcao').style.display = 'flex';
+    }
+
+    function fecharModal() {
+        document.getElementById('modalAcao').style.display = 'none';
+        aulaSelecionadaId = null;
+    }
+
+    function redirecionarSolicitacao(tipo) {
+        if (aulaSelecionadaId) {
+            window.location.href = `/solicitar/${aulaSelecionadaId}/${tipo}/`;
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,171 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Construtor de Grade - IFBA</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-voltar { text-decoration: none; padding: 8px 15px; background: #95a5a6; color: white; border-radius: 4px; font-weight: bold; }
+        
+        .seletor-turma { display: flex; gap: 15px; align-items: center; }
+        .seletor-turma select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+        .btn-carregar { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .area-trabalho { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; color: #7f8c8d; min-height: 300px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>⚙️ Construtor de Grade Base</h2>
+        <a href="{% url 'exibir_grade' %}" class="btn-voltar">⬅️ Voltar à Visão Geral</a>
+    </div>
+
+    <div style="background: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <form method="GET" class="seletor-turma">
+            <label for="turma"><strong>1. Selecione a Turma para montar:</strong></label>
+            <select name="turma" id="turma" required>
+                <option value="">-- Escolha uma Turma --</option>
+                {% for t in turmas %}
+                    <option value="{{ t.id }}" {% if turma_selecionada.id == t.id %}selected{% endif %}>
+                        {{ t.nome }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-carregar">Carregar Grelha</button>
+        </form>
+    </div>
+
+    <div class="area-trabalho">
+        {% if not turma_selecionada %}
+            <h3 style="margin: 0; color: #34495e;">Nenhuma turma selecionada</h3>
+            <p>Escolha uma turma no menu acima para começar a construir o horário.</p>
+        {% else %}
+            <h3 style="margin-bottom: 20px; color: #2ecc71;">Montando Grade Base: {{ turma_selecionada.nome }}</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                <thead style="background-color: #2c3e50; color: white;">
+                    <tr>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Horário</th>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Segunda</th>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Terça</th>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Quarta</th>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Quinta</th>
+                        <th style="padding: 10px; border: 1px solid #bdc3c7;">Sexta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hora in slots_horarios %}
+                    <tr>
+                        <td style="padding: 15px; border: 1px solid #bdc3c7; font-weight: bold; background: #ecf0f1;">{{ hora }}</td>
+                        {% for dia in dias_semana %}
+                            <td style="padding: 8px; border: 1px solid #bdc3c7; background: #fff; width: 18%; position: relative;">
+                                {% with chave=dia|stringformat:"s"|add:"-"|add:hora %}
+                                    {% if chave in grade_map %}
+                                        <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; font-size: 0.85em;">
+                                            <strong style="display: block; color: #155724;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
+                                            <span style="color: #155724;">{{ grade_map|get_item:chave|get_item:'prof' }}</span>
+                                            <br>
+                                            <button onclick="abrirModal('{{ dia }}', '{{ hora }}')" style="margin-top: 5px; font-size: 0.8em; cursor: pointer; border: none; background: none; color: #007bff; text-decoration: underline;">Editar</button>
+                                        </div>
+                                    {% else %}
+                                        <button onclick="abrirModal('{{ dia }}', '{{ hora }}')" style="width: 100%; padding: 10px 5px; border: 1px dashed #bdc3c7; background: #fafafa; cursor: pointer; color: #aaa; border-radius: 4px;">
+                                            ➕ Adicionar
+                                        </button>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+    <div id="modalConstrutor" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+        <div style="background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin-top: 0;">Alocar Aula</h3>
+            
+            <input type="hidden" id="modalDia">
+            <input type="hidden" id="modalHora">
+
+            <label style="display: block; margin-top: 15px; font-weight: bold;">Disciplina:</label>
+            <select id="modalDisciplina" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="">-- Selecione --</option>
+                {% for disc in disciplinas %}
+                    <option value="{{ disc.id }}">{{ disc.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <label style="display: block; margin-top: 15px; font-weight: bold;">Professor:</label>
+            <select id="modalProfessor" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="">-- Selecione --</option>
+                {% for prof in professores %}
+                    <option value="{{ prof.id }}">{{ prof.nome_completo }}</option>
+                {% endfor %}
+            </select>
+
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button onclick="fecharModal()" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancelar</button>
+                <button onclick="salvarAula()" style="flex: 2; padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Gravar no Sistema</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 1. IMPORTANTE: O nome deve ser 'horarios_ids_json' para bater com a View
+    const horariosData = '{{ horarios_ids_json|safe }}';
+    let horariosIds = {};
+
+    try {
+        horariosIds = JSON.parse(horariosData);
+        console.log("Horários carregados:", horariosIds); // Ajuda a depurar no F12
+    } catch (e) {
+        console.error("Erro ao ler horários do servidor", e);
+    }
+
+    function abrirModal(dia, hora) {
+        const chave = `${dia}-${hora}`;
+        const horarioId = horariosIds[chave];
+
+        // Se o botão não abre, o erro está aqui: o ID não foi encontrado para esta chave
+        if (!horarioId) {
+            console.warn("Chave não encontrada:", chave);
+            alert("Este horário (" + hora + ") não está vinculado a esta turma no cadastro de 'horários_permitidos'.");
+            return;
+        }
+
+        document.getElementById('modalDia').value = dia;
+        document.getElementById('modalHora').value = horarioId;
+        document.getElementById('modalConstrutor').style.display = 'flex';
+    }
+
+    async function salvarAula() {
+        const payload = {
+            turma_id: '{{ turma_selecionada.id }}',
+            horario_id: document.getElementById('modalHora').value,
+            disciplina_id: document.getElementById('modalDisciplina').value,
+            professor_id: document.getElementById('modalProfessor').value
+        };
+
+        if (!payload.disciplina_id || !payload.professor_id) {
+            alert("Selecione ambos!"); return;
+        }
+
+        const response = await fetch('/api/construtor/salvar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(payload)
+        });
+
+        if ((await response.json()).sucesso) location.reload();
+    }
+    
+    function fecharModal() { document.getElementById('modalConstrutor').style.display = 'none'; }
+</script>
+
+</body>
+</html>

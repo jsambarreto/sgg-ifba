@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Aprovações - Coordenação</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f6f9;}
+        h2 { color: #2c3e50; border-bottom: 2px solid #ccc; padding-bottom: 10px;}
+        .card-solicitacao { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;}
+        .detalhes { flex-grow: 1; }
+        .acoes button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; color: #fff;}
+        .btn-aprovar { background-color: #2e7d32; }
+        .btn-aprovar:hover { background-color: #1b5e20; }
+        .btn-rejeitar { background-color: #c62828; }
+        .btn-rejeitar:hover { background-color: #b71c1c; }
+        .info-aula { background: #f0f0f0; padding: 5px 10px; border-radius: 4px; display: inline-block; margin: 5px 0;}
+    </style>
+</head>
+<body>
+
+    <h2>Painel do Gestor: Permutas Pendentes</h2>
+
+    {% csrf_token %}
+
+    <div id="lista-solicitacoes">
+        {% for sol in solicitacoes %}
+        <div class="card-solicitacao" id="solicitacao-{{ sol.id }}">
+            <div class="detalhes">
+                <strong>Solicitante:</strong> Prof. {{ sol.solicitante.nome_completo }} <br>
+                <small>Data da solicitação: {{ sol.data_criacao|date:"d/m/Y H:i" }}</small>
+                
+                <div style="margin-top: 10px;">
+                    {% if sol.tipo == 'P' %}
+                        Trocar: <span class="info-aula">{{ sol.aula_origem.disciplina.nome }} ({{ sol.aula_origem.professor.nome_completo }})</span> <br>
+                        Por: <span class="info-aula">{{ sol.aula_destino.disciplina.nome }} ({{ sol.aula_destino.professor.nome_completo }})</span>
+                    {% elif sol.tipo == 'S' or sol.tipo == 'A' %}
+                        Substituir em: <span class="info-aula">{{ sol.aula_origem.horario }}</span> <br>
+                        Novo Professor: <span class="info-aula">{{ sol.professor_substituto.nome_completo }}</span> <br>
+                        Nova Disciplina: <span class="info-aula">{{ sol.disciplina_substituta.nome }}</span>
+                    {% endif %}
+                    <div class="info-pedido">
+                        <strong>Tipo:</strong> {{ sol.get_tipo_display }} 
+                        <span class="badge {% if sol.carater == 'D' %}badge-definitivo{% else %}badge-temporario{% endif %}">
+                            {% if sol.carater == 'D' %} 🚨 DEFINITIVO {% else %} 📅 SÓ DIA {{ sol.data_aplicacao|date:"d/m" }} {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="acoes">
+                <button class="btn-aprovar" onclick="processarAprovacao({{ sol.id }}, 'aprovar')">Aprovar</button>
+                <button class="btn-rejeitar" onclick="processarAprovacao({{ sol.id }}, 'rejeitar')">Rejeitar</button>
+            </div>
+        </div>
+        {% empty %}
+        <p>Não há solicitações de permuta pendentes no momento.</p>
+        {% endfor %}
+    </div>
+
+    <script>
+        async function processarAprovacao(solicitacaoId, acao) {
+            if (!confirm(`Tem certeza que deseja ${acao} esta permuta?`)) return;
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            try {
+                const response = await fetch('/api/aprovacao/processar/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        solicitacao_id: solicitacaoId,
+                        acao: acao
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.sucesso) {
+                    alert(data.mensagem);
+                    // Remove o card da tela
+                    document.getElementById(`solicitacao-${solicitacaoId}`).remove();
+                } else {
+                    alert("Erro: " + data.erro);
+                }
+            } catch (error) {
+                console.error("Erro na requisição:", error);
+                alert("Ocorreu um erro ao comunicar com o servidor.");
+            }
+        }
+    </script>
+</body>
+</html>

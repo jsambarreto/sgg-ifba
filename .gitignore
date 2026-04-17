@@ -1,0 +1,15 @@
+# Ambientes Virtuais
+venv/
+env/
+
+# Ficheiros compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configurações do Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# Banco de Dados
+# db.sqlite3 <-- NOTA: Geralmente não enviamos o banco de dados para o GitHub por segurança, mas como você vai testar no PythonAnywhere e quer manter as suas turmas cadastradas, deixe esta linha COM O JOGO DA VELHA (#) na frente por enquanto.

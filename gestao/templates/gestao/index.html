@@ -1,0 +1,44 @@
+{% extends 'gestao/base.html' %} {% block content %}
+<style>
+    .dashboard-header { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .card-atalho { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s; border-left: 4px solid #3498db; display: flex; flex-direction: column; }
+    .card-atalho:hover { transform: translateY(-5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .card-atalho h3 { margin: 0 0 10px 0; color: #2c3e50; }
+    .card-atalho p { margin: 0; color: #7f8c8d; font-size: 0.9em; flex-grow: 1; }
+    
+    /* Cores específicas para diferenciar as áreas */
+    .border-coordenacao { border-left-color: #e67e22; }
+    .border-direcao { border-left-color: #9b59b6; }
+</style>
+
+<div class="dashboard-header">
+    <h1>Olá, {{ user.professor.nome_completo|default:user.username }}!</h1>
+    <p style="color: #7f8c8d;">Bem-vindo(a) ao Sistema de Gestão de Grades do campus.</p>
+</div>
+
+<div class="cards-grid">
+    <a href="{% url 'exibir_grade' %}" class="card-atalho">
+        <h3>📅 Minha Grade</h3>
+        <p>Visualize as suas aulas, turmas e solicite permutas ou substituições.</p>
+    </a>
+
+    {% if user.professor and user.professor.is_coordenador %}
+    <a href="{% url 'construtor_grade' %}" class="card-atalho border-coordenacao">
+        <h3>⚙️ Construtor de Grade</h3>
+        <p>Acesse a matriz para alocar professores, disciplinas e montar a base do semestre.</p>
+    </a>
+    <a href="{% url 'painel_aprovacoes' %}" class="card-atalho border-coordenacao">
+        <h3>✅ Aprovações Pendentes</h3>
+        <p>Analise os pedidos de permuta e substituição submetidos pelo corpo docente.</p>
+    </a>
+    {% endif %}
+
+    {% if user.professor and user.professor.is_diretor %}
+    <a href="{% url 'relatorio_carga_horaria' %}" class="card-atalho border-direcao">
+        <h3>📊 Carga Horária Docente</h3>
+        <p>Monitore o volume de aulas atribuídas a cada professor no semestre letivo.</p>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

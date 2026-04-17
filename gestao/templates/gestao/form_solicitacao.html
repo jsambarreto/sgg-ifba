@@ -1,0 +1,62 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 4px solid #3498db;">
+    <h2 style="color: #2c3e50; margin-bottom: 20px;">Nova Solicitação: {{ nome_tipo }}</h2>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 25px; border-left: 4px solid #2ecc71;">
+        <strong>Sua Aula (Origem):</strong><br>
+        Disciplina: {{ aula_origem.disciplina.nome }}<br>
+        Turma: {{ aula_origem.turma.nome }}<br>
+        Horário Padrão: {{ aula_origem.horario.get_dia_semana_display }} às {{ aula_origem.horario.hora_inicio|time:"H:i" }}
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Data em que a aula ocorreria:</label>
+            <input type="date" name="data_aplicacao" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Caráter do Pedido:</label>
+            <select name="carater" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="T">Temporário (Apenas nesta data)</option>
+                <option value="D">Definitivo (Restante do semestre)</option>
+            </select>
+        </div>
+
+        {% if tipo == 'P' %}
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Com qual aula você vai permutar?</label>
+            <select name="aula_destino" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">-- Selecione a aula do colega --</option>
+                {% for op in opcoes_destino %}
+                    <option value="{{ op.id }}">
+                        {{ op.professor.nome_completo }} | {{ op.disciplina.nome }} ({{ op.turma.nome }}) - {{ op.horario.get_dia_semana_display }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if tipo == 'S' %}
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Quem será o professor substituto?</label>
+            <select name="prof_substituto" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">-- Selecione o professor --</option>
+                {% for prof in professores %}
+                    <option value="{{ prof.id }}">{{ prof.nome_completo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <a href="{% url 'exibir_grade' %}" style="flex: 1; text-align: center; padding: 12px; background: #95a5a6; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">Cancelar</a>
+            <button type="submit" style="flex: 2; padding: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Submeter à Coordenação</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
