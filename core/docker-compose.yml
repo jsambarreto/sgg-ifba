@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: sgg_ifba_web
+    restart: always
+    ports:
+      - "80:8000" # Mapeia a porta 80 do VPS para a 8000 do container
+    env_file:
+      - .env      # Lê o seu arquivo com as senhas de e-mail
+    volumes:
+      - sqlite_data:/app/db.sqlite3 # Salva o banco de dados fora do container para não perder os cadastros
+
+volumes:
+  sqlite_data:

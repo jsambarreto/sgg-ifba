@@ -1,0 +1,49 @@
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f6f9;}
+        h2 { color: #2c3e50; border-bottom: 2px solid #ccc; padding-bottom: 10px;}
+        
+        /* Estrutura da Tabela */
+        .grade-table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+        .grade-table th, .grade-table td { border: 1px solid #e0e0e0; padding: 8px; text-align: center; vertical-align: top; width: 16%; }
+        
+        /* Cabeçalho e Coluna de Horários */
+        .grade-table th { background-color: #2c3e50; color: #fff; font-weight: 600; padding: 12px;}
+        .horario-col { background-color: #ecf0f1; font-weight: bold; color: #34495e; vertical-align: middle; }
+        
+        /* Células de Interação */
+        .slot { min-height: 80px; transition: background 0.3s; position: relative; }
+        .slot.drag-over { background: #c8e6c9; outline: 2px dashed #4caf50; outline-offset: -4px; }
+        
+        /* Cards das Aulas */
+        .card-aula { 
+            background: #e3f2fd; 
+            padding: 8px; 
+            border-radius: 4px; 
+            cursor: grab; 
+            border: 1px solid #90caf9; 
+            font-size: 0.9em; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            min-height: 70px;
+        }
+        /* Estilo para aulas pendentes de aprovação */
+        .card-aula.pendente {
+            background-color: #fff9c4; /* Fundo amarelo suave */
+            border-color: #fbc02d;
+            cursor: not-allowed; /* Muda o cursor indicando que não pode arrastar */
+        }
+
+        .badge-pendente {
+            font-size: 0.7em;
+            background-color: #fbc02d;
+            color: #424242;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-top: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .card-aula.dragging { opacity: 0.5; }
+        .disciplina-nome { font-weight: bold; color: #1565c0; margin-bottom: 5px; text-transform: uppercase; font-size: 0.85em;}
+        .prof-nome { font-size: 0.8em; color: #555; }
