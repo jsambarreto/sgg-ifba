@@ -1,9 +1,13 @@
-# Usa uma versão oficial e leve do Python
-FROM python:3.11-slim
+# Especificamos o 'bookworm', que é a versão mais recente e segura do Debian para o Python
+FROM python:3.11-slim-bookwor
 
-# Impede o Python de gravar arquivos .pyc e força o log a sair no terminal em tempo real
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Força a atualização de segurança do Linux interno antes de qualquer outra coisa
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Define a pasta de trabalho dentro do container
 WORKDIR /app
