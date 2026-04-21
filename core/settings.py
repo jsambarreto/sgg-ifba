@@ -25,8 +25,7 @@ SECRET_KEY = config('SECRET_KEY', default='algumacoisa')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['sgg.jsambarreto.com.br', '34.28.221.89', 'localhost']
 
 
 # Application definition
@@ -133,3 +132,4 @@ LOGOUT_REDIRECT_URL = '/login/' # Volta para a tela de login após sair
 LOGIN_URL = '/login/'           # Onde o sistema barra quem tenta aceder sem login
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

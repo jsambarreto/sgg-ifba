@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 import json
 from .models import GradeHoraria, Turma, Horario, Solicitacao, Professor, Disciplina, DiaNaoLetivo
@@ -8,7 +8,7 @@ from django.db import transaction
 from datetime import datetime, timedelta
 from .decorators import apenas_coordenadores, apenas_gestores 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count,Q
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.template.loader import get_template
@@ -76,7 +76,6 @@ def exibir_grade(request):
     
     return render(request, 'gestao/grade.html', contexto)
     
-
 def api_solicitar_permuta(request):
     if request.method == 'POST':
         try:
@@ -226,6 +225,7 @@ def api_gerar_grade_vazia(request):
 
 @login_required
 @apenas_gestores
+@apenas_coordenadores 
 def construtor_grade(request):
     turmas = Turma.objects.all().order_by('nome')
     turma_id = request.GET.get('turma')
@@ -270,6 +270,7 @@ def construtor_grade(request):
 
 @login_required
 @apenas_gestores
+@apenas_coordenadores 
 def api_salvar_aula_base(request):
     if request.method == 'POST':
         try:
@@ -309,8 +310,6 @@ def pagina_inicial(request):
     """
     return render(request, 'gestao/index.html')
 
-from .models import Solicitacao # Confirme se está importado no topo
-
 @login_required
 def minhas_solicitacoes(request):
     """
@@ -323,9 +322,6 @@ def minhas_solicitacoes(request):
         solicitacoes = []
         
     return render(request, 'gestao/minhas_solicitacoes.html', {'solicitacoes': solicitacoes})
-
-from django.core.mail import send_mail
-from django.http import HttpResponse
 
 def teste_email(request):
     try:
@@ -352,8 +348,6 @@ def teste_email(request):
                 <code style='background: #eee; padding: 10px; display: block; max-width: 600px; margin: auto;'>{str(e)}</code>
             </div>
         """)
-
-from django.db.models import Q # Adicione este import no topo se não o tiver
 
 @login_required
 def gerar_pdf_sei(request, id):
@@ -407,11 +401,6 @@ def gerar_pdf_sei(request, id):
         return HttpResponse('Tivemos erros ao gerar o PDF: <pre>' + html + '</pre>')
     
     return response
-
-from django.shortcuts import get_object_or_404, redirect
-
-from django.core.mail import send_mail
-from django.conf import settings
 
 @login_required
 def nova_solicitacao(request, aula_id, tipo):
