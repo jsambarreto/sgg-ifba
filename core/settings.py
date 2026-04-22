@@ -25,7 +25,7 @@ SECRET_KEY = config('SECRET_KEY', default='algumacoisa')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-ALLOWED_HOSTS = ['sgg.jsambarreto.com.br', '34.28.221.89', 'localhost']
+ALLOWED_HOSTS = ['sgg.jsambarreto.com.br', '34.28.221.89', 'localhost','127.0.0.1']
 
 
 # Application definition

@@ -8,7 +8,7 @@ class Professor(models.Model):
     
     # Perfis de Acesso
     is_coordenador = models.BooleanField(default=False) 
-    is_diretor = models.BooleanField(default=False) # Adicione esta linha
+    is_diretor = models.BooleanField(default=False)
 
     def __str__(self):
         return self.nome_completo
@@ -23,7 +23,6 @@ class Disciplina(models.Model):
 class Horario(models.Model):
     TURNO_CHOICES = [('M', 'Matutino'), ('V', 'Vespertino'), ('N', 'Noturno')]
     
-    # 1. Adicionamos a lista de escolhas para mapear os seus números
     DIA_CHOICES = [
         (1, 'Domingo'),
         (2, 'Segunda-feira'),
@@ -34,7 +33,6 @@ class Horario(models.Model):
         (7, 'Sábado'),
     ]
 
-    # 2. Vinculamos o choices ao campo
     dia_semana = models.IntegerField(choices=DIA_CHOICES)
     hora_inicio = models.TimeField()
     hora_fim = models.TimeField()
@@ -45,7 +43,6 @@ class Horario(models.Model):
 
 class Turma(models.Model):
     nome = models.CharField(max_length=100)
-    # Agora a turma diz quais horários ela pode usar (Muitos-para-Muitos)
     horarios_permitidos = models.ManyToManyField(Horario, related_name='turmas_permitidas', blank=True)
 
     def __str__(self):
@@ -77,15 +74,19 @@ class Solicitacao(models.Model):
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='P')
     solicitante = models.ForeignKey(Professor, on_delete=models.CASCADE)
     data_criacao = models.DateTimeField(auto_now_add=True)
-    data_aplicacao = models.DateField(help_text="Data específica em que a troca ocorrerá")
+    
+    # --- DATAS DE APLICAÇÃO E DEVOLUÇÃO (SISTEMA DE CRÉDITO) ---
+    data_aplicacao = models.DateField(help_text="Data específica em que a ausência/troca inicial ocorrerá")
+    data_devolucao = models.DateField(null=True, blank=True, help_text="Data em que a aula será devolvida (se já estiver combinada)")
+    devolucao_pendente = models.BooleanField(default=False, help_text="Marca se o professor ficou devendo esta aula para o substituto")
 
-    # A aula que está a ser afetada
+    # A aula que está a ser afetada inicialmente
     aula_origem = models.ForeignKey(GradeHoraria, related_name='solicitacoes_origem', on_delete=models.CASCADE)
     
     # Para Permutas
     aula_destino = models.ForeignKey(GradeHoraria, related_name='solicitacoes_destino', null=True, blank=True, on_delete=models.CASCADE)
     
-    # Para Substituições Diretas OU Assunções (qual professor e qual disciplina vão entrar)
+    # Para Substituições Diretas OU Assunções
     professor_substituto = models.ForeignKey(Professor, related_name='substituicoes', null=True, blank=True, on_delete=models.CASCADE)
     disciplina_substituta = models.ForeignKey(Disciplina, related_name='substituicoes_disciplina', null=True, blank=True, on_delete=models.CASCADE)
 
@@ -93,8 +94,6 @@ class DiaNaoLetivo(models.Model):
     data = models.DateField(unique=True, help_text="Data do feriado, recesso ou conselho de classe.")
     descricao = models.CharField(max_length=100, help_text="Ex: Feriado Nacional, Recesso Escolar, etc.")
     
-    # Opcional: Se quiser que o feriado afete apenas turmas específicas no futuro, 
-    # deixamos o campo turmas_afetadas em branco por padrão (afeta a escola toda).
     turmas_afetadas = models.ManyToManyField('Turma', blank=True, help_text="Deixe em branco para aplicar a toda a instituição.")
 
     def __str__(self):

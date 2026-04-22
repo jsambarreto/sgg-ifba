@@ -3,12 +3,11 @@ from django.http import JsonResponse
 import json
 from .models import GradeHoraria, Turma, Horario, Solicitacao, Professor, Disciplina, DiaNaoLetivo
 from .services import gerar_grade_vazia_para_turma, processar_permuta, processar_acao_modal
-from django.shortcuts import get_object_or_404
 from django.db import transaction
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from .decorators import apenas_coordenadores, apenas_gestores 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count,Q
+from django.db.models import Count, Q
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.template.loader import get_template
@@ -23,43 +22,124 @@ def exibir_grade(request):
     except:
         return HttpResponse("O seu utilizador não está vinculado a um perfil de Professor.")
 
-    # Descobre qual aba o professor clicou (padrão é 'pessoal')
     aba_ativa = request.GET.get('aba', 'pessoal')
     turma_selecionada_id = request.GET.get('turma')
+
+    # ==========================================
+    # LÓGICA DE NAVEGAÇÃO POR SEMANAS
+    # ==========================================
+    data_str = request.GET.get('data')
+    if data_str:
+        try:
+            data_foco = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            data_foco = date.today()
+    else:
+        data_foco = date.today()
+
+    # Calcula o início (Segunda) e fim (Domingo) da semana selecionada
+    dia_semana_num = data_foco.weekday() # 0 = Segunda, 6 = Domingo
+    inicio_semana = data_foco - timedelta(days=dia_semana_num)
+    fim_semana = inicio_semana + timedelta(days=6)
+
+    # Strings para os botões de navegação no HTML
+    semana_anterior = (inicio_semana - timedelta(days=7)).strftime('%Y-%m-%d')
+    proxima_semana = (inicio_semana + timedelta(days=7)).strftime('%Y-%m-%d')
 
     grade_pessoal_map = {}
     grade_turma_map = {}
     turma_selecionada = None
 
-    # --- ABA 1: MINHA GRADE (Todas as minhas aulas) ---
+    # ==========================================
+    # ABA 1: MINHA GRADE (Com sobreposição)
+    # ==========================================
     aulas_do_prof = GradeHoraria.objects.filter(professor=professor_logado).select_related('turma', 'disciplina', 'horario')
+    
     for aula in aulas_do_prof:
         chave = f"{aula.horario.dia_semana}-{aula.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
             'id': aula.id,
             'turma': aula.turma.nome,
             'disciplina': aula.disciplina.nome if aula.disciplina else "---",
+            'info_extra': '', 
+            'cor': ''         
         }
 
-    # --- ABA 2: GRADE DA TURMA (Visão geral para permutas) ---
-    # Busca apenas as turmas onde este professor dá aula para preencher o dropdown
+    # Sobrepõe Aulas APENAS SE ACONTECEREM NESTA SEMANA
+    saidas = Solicitacao.objects.filter(solicitante=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana])
+    for sol in saidas:
+        chave = f"{sol.aula_origem.horario.dia_semana}-{sol.aula_origem.horario.hora_inicio.strftime('%H:%M')}"
+        if chave in grade_pessoal_map:
+            data_formatada = sol.data_aplicacao.strftime('%d/%m')
+            if sol.tipo == 'L':
+                grade_pessoal_map[chave]['info_extra'] = f"Ausente em {data_formatada}"
+                grade_pessoal_map[chave]['cor'] = '#ffcccc' 
+            elif sol.tipo == 'S':
+                nome_sub = sol.professor_substituto.nome_completo.split()[0] if sol.professor_substituto else 'Alguém'
+                grade_pessoal_map[chave]['info_extra'] = f"Subst. por {nome_sub}"
+                grade_pessoal_map[chave]['cor'] = '#ffeeba' 
+            elif sol.tipo == 'P' and sol.aula_destino:
+                nome_perm = sol.aula_destino.professor.nome_completo.split()[0]
+                grade_pessoal_map[chave]['info_extra'] = f"Permuta c/ {nome_perm}"
+                grade_pessoal_map[chave]['cor'] = '#d1ecf1' 
+
+    entradas_sub = Solicitacao.objects.filter(professor_substituto=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='S')
+    for sol in entradas_sub:
+        chave = f"{sol.aula_origem.horario.dia_semana}-{sol.aula_origem.horario.hora_inicio.strftime('%H:%M')}"
+        grade_pessoal_map[chave] = {
+            'id': sol.aula_origem.id,
+            'turma': sol.aula_origem.turma.nome,
+            'disciplina': sol.disciplina_substituta.nome if sol.disciplina_substituta else sol.aula_origem.disciplina.nome,
+            'info_extra': f"Cobrindo {sol.solicitante.nome_completo.split()[0]}",
+            'cor': '#d4edda' 
+        }
+        
+    entradas_perm = Solicitacao.objects.filter(aula_destino__professor=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='P')
+    for sol in entradas_perm:
+        chave = f"{sol.aula_destino.horario.dia_semana}-{sol.aula_destino.horario.hora_inicio.strftime('%H:%M')}"
+        grade_pessoal_map[chave] = {
+            'id': sol.aula_destino.id,
+            'turma': sol.aula_origem.turma.nome, 
+            'disciplina': sol.aula_origem.disciplina.nome,
+            'info_extra': f"Cobrindo {sol.solicitante.nome_completo.split()[0]}",
+            'cor': '#d4edda' 
+        }
+
+    # ==========================================
+    # ABA 2: GRADE DA TURMA (Com sobreposição)
+    # ==========================================
     turmas_do_prof = Turma.objects.filter(grade__professor=professor_logado).distinct().order_by('nome')
     
     if aba_ativa == 'turma' and turma_selecionada_id:
         turma_selecionada = Turma.objects.filter(id=turma_selecionada_id).first()
         if turma_selecionada:
             aulas_da_turma = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('professor', 'disciplina', 'horario')
+            
             for aula in aulas_da_turma:
                 chave = f"{aula.horario.dia_semana}-{aula.horario.hora_inicio.strftime('%H:%M')}"
                 grade_turma_map[chave] = {
                     'id': aula.id,
                     'professor': aula.professor.nome_completo if aula.professor else "Sem Prof.",
                     'disciplina': aula.disciplina.nome if aula.disciplina else "---",
-                    # Flag para pintar de cor diferente a aula que é dele
-                    'is_minha_aula': aula.professor == professor_logado 
+                    'is_minha_aula': aula.professor == professor_logado,
+                    'info_extra': '',
+                    'cor': ''
                 }
+                
+            trocas_turma = Solicitacao.objects.filter(aula_origem__turma=turma_selecionada, status='A', data_aplicacao__range=[inicio_semana, fim_semana])
+            for sol in trocas_turma:
+                chave = f"{sol.aula_origem.horario.dia_semana}-{sol.aula_origem.horario.hora_inicio.strftime('%H:%M')}"
+                if chave in grade_turma_map:
+                    if sol.tipo == 'L':
+                        grade_turma_map[chave]['info_extra'] = f"Faltará dia {sol.data_aplicacao.strftime('%d/%m')}"
+                        grade_turma_map[chave]['cor'] = '#ffcccc'
+                    elif sol.tipo == 'S' or sol.tipo == 'P':
+                        prof_novo = sol.professor_substituto if sol.tipo == 'S' else sol.aula_destino.professor
+                        nome_novo = prof_novo.nome_completo.split()[0] if prof_novo else 'Alguém'
+                        grade_turma_map[chave]['professor'] = f"{nome_novo} (Subst.)"
+                        grade_turma_map[chave]['info_extra'] = f"Cobrindo {sol.solicitante.nome_completo.split()[0]}"
+                        grade_turma_map[chave]['cor'] = '#ffeeba'
 
-    # Horários da tabela
     horarios_unicos = Horario.objects.all().order_by('hora_inicio').values_list('hora_inicio', flat=True).distinct()
     slots_horarios = [h.strftime('%H:%M') for h in horarios_unicos]
 
@@ -71,7 +151,11 @@ def exibir_grade(request):
         'grade_turma_map': grade_turma_map,
         'dias_semana': [2, 3, 4, 5, 6],
         'slots_horarios': slots_horarios,
-        'professor': professor_logado
+        'professor': professor_logado,
+        'inicio_semana': inicio_semana,
+        'fim_semana': fim_semana,
+        'semana_anterior': semana_anterior,
+        'proxima_semana': proxima_semana,
     }
     
     return render(request, 'gestao/grade.html', contexto)
@@ -79,19 +163,13 @@ def exibir_grade(request):
 def api_solicitar_permuta(request):
     if request.method == 'POST':
         try:
-            # Lê os dados enviados pelo JavaScript
             dados = json.loads(request.body)
             origem_id = dados.get('aula_origem_id')
             destino_id = dados.get('aula_destino_id')
             data_aplicacao = dados.get('data_aplicacao')
 
-            from datetime import datetime
             data_app = dados.get('data_aplicacao', datetime.now().strftime('%Y-%m-%d'))
             carater = dados.get('carater', 'T')
-
-            # O usuário logado que está fazendo a solicitação (precisa estar logado como professor/gestor)
-            # Para testes rápidos no painel admin, vamos usar o professor associado ao usuário logado
-            # Em vez de: solicitante = request.user.professor
 
             solicitante = getattr(request.user, 'professor', None)
 
@@ -103,8 +181,8 @@ def api_solicitar_permuta(request):
 
             resultado = processar_permuta(
                 solicitante=request.user.professor,
-                id_aula_origem=dados.get('aula_origem_id'),   # <-- Ajustado
-                id_aula_destino=dados.get('aula_destino_id'), # <-- Ajustado
+                id_aula_origem=dados.get('aula_origem_id'),   
+                id_aula_destino=dados.get('aula_destino_id'), 
                 data_aplicacao=data_app,
                 carater=carater
             )
@@ -119,8 +197,6 @@ def api_solicitar_permuta(request):
 @login_required
 @apenas_coordenadores
 def painel_aprovacoes(request):
-    """ Exibe a tela para o Coordenador ver as solicitações pendentes """
-    # Busca todas as solicitações com status 'P' (Pendente)
     solicitacoes = Solicitacao.objects.filter(status='P').select_related(
         'solicitante', 'aula_origem__disciplina', 'aula_destino__disciplina'
     ).order_by('-data_criacao')
@@ -134,37 +210,26 @@ def api_processar_aprovacao(request):
             solicitacao = get_object_or_404(Solicitacao, id=dados.get('solicitacao_id'))
             acao = dados.get('acao')
 
-            # Dentro de api_processar_aprovacao
             if acao == 'aprovar':
-                print(f"DEBUG: Aprovando pedido {solicitacao.id} - Carater: {solicitacao.carater}")
-                
                 with transaction.atomic():
                     if solicitacao.carater == 'D':
-                        print("DEBUG: Entrou na lógica de alteração DEFINITIVA da grade base.")
                         aula_origem = solicitacao.aula_origem
-                        
-                        if solicitacao.tipo == 'P': # Permuta
+                        if solicitacao.tipo == 'P': 
                             aula_destino = solicitacao.aula_destino
-                            # Troca os dados
                             prof_orig, disc_orig = aula_origem.professor, aula_origem.disciplina
                             aula_origem.professor = aula_destino.professor
                             aula_origem.disciplina = aula_destino.disciplina
                             aula_destino.professor = prof_orig
                             aula_destino.disciplina = disc_orig
                             aula_destino.save()
-                        else: # Substituição ou Assunção
+                        else: 
                             aula_origem.professor = solicitacao.professor_substituto
                             aula_origem.disciplina = solicitacao.disciplina_substituta
                         
                         aula_origem.save()
-                        print(f"DEBUG: GradeHoraria ID {aula_origem.id} atualizada com sucesso.")
-                    
                     else:
-                        # SE FOR TEMPORÁRIO: Nós NÃO tocamos na aula_origem nem aula_destino.
-                        # O fato de a solicitação passar para status='A' já a torna uma exceção válida para o relatório e para a data específica.
-                        mensagem = f"Alteração TEMPORÁRIA para o dia {solicitacao.data_aplicacao.strftime('%d/%m/%Y')} aprovada com sucesso!"
+                        mensagem = f"Alteração aprovada com sucesso!"
 
-                    # Para ambos os casos, a solicitação fica aprovada
                     solicitacao.status = 'A'
                     solicitacao.save()
                     mensagem = "Alteração oficializada com sucesso!"
@@ -205,7 +270,6 @@ def api_acao_modal(request):
 @login_required
 @apenas_coordenadores       
 def api_gerar_grade_vazia(request):
-    """ View que recebe o comando do botão HTML para rodar o script """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
@@ -214,7 +278,6 @@ def api_gerar_grade_vazia(request):
             if not turma_id:
                 return JsonResponse({'sucesso': False, 'erro': 'ID da turma não fornecido.'})
                 
-            # Roda o nosso script
             resultado = gerar_grade_vazia_para_turma(turma_id)
             return JsonResponse(resultado)
             
@@ -238,17 +301,11 @@ def construtor_grade(request):
     if turma_id:
         turma_selecionada = Turma.objects.filter(id=turma_id).first()
         if turma_selecionada:
-            # Pegamos os horários permitidos para esta turma
             h_permitidos = turma_selecionada.horarios_permitidos.all().order_by('hora_inicio')
-            
-            # Criamos a lista de horários (linhas da tabela)
             slots_horarios = sorted(list(set(h.hora_inicio.strftime('%H:%M') for h in h_permitidos)))
-            
-            # Mapeamos IDs para o JavaScript: "Dia-Hora" -> ID do Horário
             for h in h_permitidos:
                 horarios_ids[f"{h.dia_semana}-{h.hora_inicio.strftime('%H:%M')}"] = h.id
 
-            # Carregamos o que já existe na GradeHoraria
             grade = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('professor', 'disciplina', 'horario')
             for item in grade:
                 chave = f"{item.horario.dia_semana}-{item.horario.hora_inicio.strftime('%H:%M')}"
@@ -261,7 +318,7 @@ def construtor_grade(request):
         'turmas': turmas,
         'turma_selecionada': turma_selecionada,
         'slots_horarios': slots_horarios,
-        'dias_semana': [2, 3, 4, 5, 6], # Segunda a Sexta conforme seu DIA_CHOICES
+        'dias_semana': [2, 3, 4, 5, 6], 
         'grade_map': grade_map,
         'horarios_ids_json': json.dumps(horarios_ids),
         'professores': Professor.objects.all().order_by('nome_completo'),
@@ -275,7 +332,6 @@ def api_salvar_aula_base(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            # Usamos update_or_create para garantir que não haja duplicatas (unique_together do seu model)
             GradeHoraria.objects.update_or_create(
                 turma_id=dados.get('turma_id'),
                 horario_id=dados.get('horario_id'),
@@ -291,31 +347,43 @@ def api_salvar_aula_base(request):
 
 @login_required
 def relatorio_carga_horaria(request):
-    # 1. Proteção Dupla: Só entra se for Admin da TI ou Diretor
     if not (request.user.is_superuser or (hasattr(request.user, 'professor') and request.user.professor.is_diretor)):
         raise PermissionDenied("Acesso restrito à Direção do Campus.")
 
-    # 2. A Mágica do Django (Contagem Rápida)
-    # Pega todos os professores e conta quantos "quadradinhos" de gradehoraria eles têm
     professores = Professor.objects.annotate(
         total_aulas=Count('gradehoraria')
-    ).order_by('-total_aulas') # O sinal de menos (-) ordena do maior para o menor
+    ).order_by('-total_aulas') 
 
     return render(request, 'gestao/relatorio_carga.html', {'professores': professores})
 
 @login_required
 def pagina_inicial(request):
     """
-    Dashboard principal. Renderiza atalhos dependendo do perfil do usuário.
+    Dashboard principal. Renderiza atalhos e agora o BANCO DE AULAS (Créditos e Dívidas).
     """
-    return render(request, 'gestao/index.html')
+    prof = getattr(request.user, 'professor', None)
+    dividas = []
+    creditos = []
+    
+    if prof:
+        # Aulas que eu pedi substituição "A Combinar" e ainda não devolvi
+        dividas = Solicitacao.objects.filter(
+            solicitante=prof, status='A', devolucao_pendente=True
+        ).exclude(tipo='L').order_by('data_aplicacao')
+
+        # Aulas que eu cobri alguém e ainda não me pagaram
+        creditos_sub = Solicitacao.objects.filter(
+            professor_substituto=prof, status='A', devolucao_pendente=True
+        )
+        creditos_perm = Solicitacao.objects.filter(
+            aula_destino__professor=prof, status='A', devolucao_pendente=True
+        )
+        creditos = list(creditos_sub) + list(creditos_perm)
+        
+    return render(request, 'gestao/index.html', {'dividas': dividas, 'creditos': creditos})
 
 @login_required
 def minhas_solicitacoes(request):
-    """
-    Tela onde o professor comum vê o status dos pedidos que ele fez.
-    """
-    # Se o login for o Admin e ele não tiver um "professor" associado, evitamos o erro
     if hasattr(request.user, 'professor'):
         solicitacoes = Solicitacao.objects.filter(solicitante=request.user.professor).order_by('-data_criacao')
     else:
@@ -325,48 +393,32 @@ def minhas_solicitacoes(request):
 
 def teste_email(request):
     try:
-        # Estrutura: Assunto, Mensagem, Remetente, [Lista de Destinatários]
         send_mail(
             '🚀 Sucesso! Sistema SGG IFBA Conectado',
-            'Olá! Se você está lendo esta mensagem, significa que a sua Senha de Aplicativo funcionou perfeitamente.\n\nO servidor SMTP do Django está online e o sistema de gestão de grades já pode notificar a coordenação e os professores automaticamente!',
-            None, # Deixe None para ele usar o DEFAULT_FROM_EMAIL do settings.py
-            ['informatica.euc@ifba.edu.br'], # <-- COLOQUE O SEU EMAIL AQUI
+            'Email teste enviado.',
+            None, 
+            ['informatica.euc@ifba.edu.br'], 
             fail_silently=False,
         )
-        return HttpResponse("""
-            <div style='font-family: sans-serif; text-align: center; margin-top: 50px;'>
-                <h1 style='color: #2ecc71;'>✔️ Email enviado com sucesso!</h1>
-                <p>Abra a sua caixa de entrada (ou pasta de spam) para verificar.</p>
-                <a href='/' style='text-decoration: none; background: #3498db; color: white; padding: 10px 20px; border-radius: 5px;'>Voltar ao Sistema</a>
-            </div>
-        """)
+        return HttpResponse("Email enviado")
     except Exception as e:
-        return HttpResponse(f"""
-            <div style='font-family: sans-serif; text-align: center; margin-top: 50px;'>
-                <h1 style='color: #e74c3c;'>❌ Erro ao enviar email</h1>
-                <p>O servidor retornou o seguinte erro:</p>
-                <code style='background: #eee; padding: 10px; display: block; max-width: 600px; margin: auto;'>{str(e)}</code>
-            </div>
-        """)
+        return HttpResponse(f"Erro: {str(e)}")
 
 @login_required
 def gerar_pdf_sei(request, id):
-    # 1. Pega a solicitação em que o utilizador clicou
     solicitacao_base = get_object_or_404(Solicitacao, id=id)
     
     if solicitacao_base.status != 'A':
         return HttpResponse("Apenas solicitações APROVADAS podem gerar o formulário do SEI.", status=403)
 
-    # 2. A MÁGICA: Puxa TODAS as solicitações do mesmo professor feitas no MESMO DIA
     data_do_pedido = solicitacao_base.data_criacao.date()
     
     solicitacoes_do_lote = Solicitacao.objects.filter(
         solicitante=solicitacao_base.solicitante,
         data_criacao__date=data_do_pedido,
         status='A'
-    ).order_by('data_aplicacao') # Ordena por data da aula
+    ).order_by('data_aplicacao') 
 
-    # 3. Organiza os dados para o PDF
     substitutos_unicos = set()
     tem_permuta = False
     cursos_envolvidos = set()
@@ -388,7 +440,6 @@ def gerar_pdf_sei(request, id):
         'substitutos': list(substitutos_unicos),
     }
 
-    # 4. Geração do PDF
     template_path = 'gestao/pdf_sei.html'
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="SEI_Permutas_{data_do_pedido.strftime("%Y%m%d")}.pdf"'
@@ -404,23 +455,43 @@ def gerar_pdf_sei(request, id):
 
 @login_required
 def nova_solicitacao(request, aula_id, tipo):
-    # 1. Identifica a aula e o professor
     aula_origem = get_object_or_404(GradeHoraria, id=aula_id)
     professor_logado = request.user.professor
     
-    # CORREÇÃO: Definimos o nome_tipo aqui no topo para todo o código poder usar!
-    nome_tipo = 'Permuta' if tipo == 'P' else 'Substituição'
+    if tipo == 'P':
+        nome_tipo = 'Permuta'
+    elif tipo == 'S':
+        nome_tipo = 'Substituição'
+    elif tipo == 'L':
+        nome_tipo = 'Aviso de Falta (Liberação)'
+    else:
+        nome_tipo = 'Solicitação'
 
     if request.method == 'POST':
         data_aplicacao = request.POST.get('data_aplicacao')
         carater = request.POST.get('carater', 'T') 
         
-        # Cria a base da solicitação
+        # --- LÓGICA DE DEVOLUÇÃO (SISTEMA DE CRÉDITO) ---
+        data_devolucao_post = request.POST.get('data_devolucao')
+        a_combinar = request.POST.get('a_combinar') == 'on' # Checkbox no formulário
+        
+        devolucao_pendente = False
+        data_devolucao = None
+        
+        # Se for Falta (L), não há devolução
+        if tipo != 'L':
+            if a_combinar or not data_devolucao_post:
+                devolucao_pendente = True
+            else:
+                data_devolucao = data_devolucao_post
+
         nova_sol = Solicitacao(
             solicitante=professor_logado,
             tipo=tipo,
             aula_origem=aula_origem,
             data_aplicacao=data_aplicacao,
+            data_devolucao=data_devolucao,
+            devolucao_pendente=devolucao_pendente,
             carater=carater,
             status='P'
         )
@@ -432,72 +503,56 @@ def nova_solicitacao(request, aula_id, tipo):
             prof_sub_id = request.POST.get('prof_substituto')
             nova_sol.professor_substituto = get_object_or_404(Professor, id=prof_sub_id)
             nova_sol.disciplina_substituta = aula_origem.disciplina
-
+        
         nova_sol.save()
         
-        # ========================================================
-        # INÍCIO DO ALERTA POR E-MAIL (Apenas para Coordenação)
-        # ========================================================
         try:
             assunto = f"⏳ Novo Pedido de {nome_tipo} - {professor_logado.nome_completo}"
-            
-            mensagem = f"""Olá, Coordenação.
-
-Um novo pedido de {nome_tipo} foi submetido no Sistema de Gestão de Grades (SGG) e aguarda a sua análise.
-
-👨‍🏫 Professor: {professor_logado.nome_completo}
-📚 Disciplina: {aula_origem.disciplina.nome}
-🏫 Turma: {aula_origem.turma.nome}
-📅 Data da Ausência: {data_aplicacao}
-
-Por favor, acesse o painel de aprovações do sistema para verificar os detalhes e emitir o parecer oficial.
-
-Atenciosamente,
-SGG IFBA"""
-
-            # Lembre-se de colocar o e-mail de teste aqui
+            mensagem = f"""Olá, Coordenação. Foi feito um pedido de {nome_tipo}. Acesse o sistema."""
             destinatarios = ['informatica.euc@ifba.edu.br']
-
-            send_mail(
-                assunto,
-                mensagem,
-                settings.DEFAULT_FROM_EMAIL,
-                destinatarios,
-                fail_silently=True, 
-            )
+            send_mail(assunto, mensagem, settings.DEFAULT_FROM_EMAIL, destinatarios, fail_silently=True)
         except Exception as e:
-            print(f"Aviso: Erro ao enviar e-mail para a coordenação: {e}")
+            print(f"Erro e-mail: {e}")
             
-        # ========================================================
-        
         return redirect('minhas_solicitacoes')
 
-    # Se for GET (Abertura da página)
     contexto = {
         'aula_origem': aula_origem,
         'tipo': tipo,
-        'nome_tipo': nome_tipo, # Usa a variável que criámos lá no topo
+        'nome_tipo': nome_tipo, 
     }
     
     if tipo == 'P':
-        contexto['opcoes_destino'] = GradeHoraria.objects.exclude(professor=professor_logado).select_related('professor', 'disciplina', 'turma', 'horario')
+        contexto['opcoes_destino'] = GradeHoraria.objects.filter(
+            turma=aula_origem.turma
+        ).exclude(
+            professor=professor_logado
+        ).select_related('professor', 'disciplina', 'turma', 'horario')
+        
     elif tipo == 'S':
         contexto['professores'] = Professor.objects.exclude(id=professor_logado.id).order_by('nome_completo')
 
     return render(request, 'gestao/form_solicitacao.html', contexto)
 
-    # Se for GET (apenas a abrir a página), preparamos as listas para os dropdowns
-    contexto = {
-        'aula_origem': aula_origem,
-        'tipo': tipo,
-        'nome_tipo': 'Permuta' if tipo == 'P' else 'Substituição',
-    }
-    
-    if tipo == 'P':
-        # Lista as aulas de OUTROS professores para ele escolher com quem trocar
-        contexto['opcoes_destino'] = GradeHoraria.objects.exclude(professor=professor_logado).select_related('professor', 'disciplina', 'turma', 'horario')
-    elif tipo == 'S':
-        # Lista os OUTROS professores para ele escolher quem vai substituí-lo
-        contexto['professores'] = Professor.objects.exclude(id=professor_logado.id).order_by('nome_completo')
+def api_informar_pagamento(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            solicitacao_id = dados.get('solicitacao_id')
+            data_pagamento = dados.get('data_pagamento')
 
-    return render(request, 'gestao/form_solicitacao.html', contexto)
+            solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
+
+            # Segurança: Garante que apenas o devedor pode informar o pagamento
+            if solicitacao.solicitante != getattr(request.user, 'professor', None):
+                return JsonResponse({'sucesso': False, 'erro': 'Sem permissão para alterar esta dívida.'})
+
+            # Atualiza os campos de crédito que criamos
+            solicitacao.data_devolucao = data_pagamento
+            solicitacao.devolucao_pendente = False
+            solicitacao.save()
+
+            return JsonResponse({'sucesso': True, 'mensagem': 'Pagamento registrado com sucesso!'})
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})

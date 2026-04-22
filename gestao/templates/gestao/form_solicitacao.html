@@ -15,8 +15,9 @@
         {% csrf_token %}
         
         <div style="margin-bottom: 15px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Data em que a aula ocorreria:</label>
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Data da Ausência / Troca:</label>
             <input type="date" name="data_aplicacao" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <small style="color: #7f8c8d;">O dia exato em que você não dará esta aula.</small>
         </div>
 
         <div style="margin-bottom: 15px;">
@@ -51,6 +52,35 @@
                 {% endfor %}
             </select>
         </div>
+        {% endif %}
+
+        {% if tipo != 'L' %}
+        <div style="margin-bottom: 25px; padding: 15px; background: #e8f4f8; border-radius: 6px; border-left: 4px solid #f39c12;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #d35400;">Data de Devolução (Pagamento da Aula):</label>
+            <p style="font-size: 0.85em; color: #7f8c8d; margin-top: 0;">Quando você irá cobrir o professor que o está ajudando?</p>
+            
+            <input type="date" name="data_devolucao" id="data_devolucao" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;">
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #2c3e50; font-weight: bold;">
+                <input type="checkbox" name="a_combinar" id="a_combinar" onchange="toggleDevolucao()" style="width: 18px; height: 18px;"> 
+                A combinar (Ficar devendo esta aula)
+            </label>
+        </div>
+
+        <script>
+            function toggleDevolucao() {
+                var checkbox = document.getElementById('a_combinar');
+                var dateInput = document.getElementById('data_devolucao');
+                if(checkbox.checked) {
+                    dateInput.value = '';
+                    dateInput.disabled = true;
+                    dateInput.style.backgroundColor = '#ecf0f1';
+                } else {
+                    dateInput.disabled = false;
+                    dateInput.style.backgroundColor = '#fff';
+                }
+            }
+        </script>
         {% endif %}
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">

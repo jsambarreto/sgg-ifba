@@ -18,5 +18,6 @@ urlpatterns = [
     path('minhas-solicitacoes/', views.minhas_solicitacoes, name='minhas_solicitacoes'),
     path('solicitacao/<int:id>/pdf-sei/', views.gerar_pdf_sei, name='gerar_pdf_sei'),
     path('solicitar/<int:aula_id>/<str:tipo>/', views.nova_solicitacao, name='nova_solicitacao'),
+    path('api/pagar/', views.api_informar_pagamento, name='api_informar_pagamento'),
 ]
 

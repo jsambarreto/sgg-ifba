@@ -12,20 +12,39 @@
     .card-aula:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(26, 188, 156, 0.3); }
     
     .card-colega { background: #f8f9fa; border: 1px dashed #bdc3c7; padding: 10px; border-radius: 4px; font-size: 0.85em; color: #7f8c8d; }
+    
+    .nav-semana { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
+    .btn-nav { background: white; border: 1px solid #bdc3c7; padding: 8px 15px; border-radius: 4px; color: #2c3e50; text-decoration: none; font-weight: bold; transition: 0.2s; }
+    .btn-nav:hover { background: #ecf0f1; }
 </style>
 
 <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-    <h2 style="color: #2c3e50; margin-bottom: 20px;">📅 Grade Horária</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #2c3e50; margin: 0;">📅 Grade Horária</h2>
+    </div>
+
+    <div class="nav-semana">
+        <a href="?aba={{ aba_ativa }}{% if turma_selecionada %}&turma={{ turma_selecionada.id }}{% endif %}&data={{ semana_anterior }}" class="btn-nav">⬅️ Semana Anterior</a>
+        
+        <div style="text-align: center;">
+            <span style="display: block; font-size: 0.9em; color: #7f8c8d; text-transform: uppercase; font-weight: bold;">Semana de Exibição</span>
+            <span style="font-weight: bold; color: #2c3e50; font-size: 1.2em;">{{ inicio_semana|date:"d/m" }} a {{ fim_semana|date:"d/m" }}</span>
+        </div>
+        
+        <a href="?aba={{ aba_ativa }}{% if turma_selecionada %}&turma={{ turma_selecionada.id }}{% endif %}&data={{ proxima_semana }}" class="btn-nav">Próxima Semana ➡️</a>
+    </div>
 
     <div class="abas-nav">
-        <a href="?aba=pessoal" class="aba-btn {% if aba_ativa == 'pessoal' %}ativa{% endif %}">👤 Minhas Aulas</a>
-        <a href="?aba=turma" class="aba-btn {% if aba_ativa == 'turma' %}ativa{% endif %}">🏫 Visão da Turma (Permutas)</a>
+        <a href="?aba=pessoal&data={{ inicio_semana|date:'Y-m-d' }}" class="aba-btn {% if aba_ativa == 'pessoal' %}ativa{% endif %}">👤 Minhas Aulas</a>
+        <a href="?aba=turma&data={{ inicio_semana|date:'Y-m-d' }}" class="aba-btn {% if aba_ativa == 'turma' %}ativa{% endif %}">🏫 Visão da Turma (Permutas)</a>
     </div>
 
     {% if aba_ativa == 'turma' %}
         <div style="background: #fdfefe; padding: 15px; border-radius: 6px; border: 1px solid #eee; margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
             <form method="GET" style="display: flex; gap: 15px; align-items: center; width: 100%;">
                 <input type="hidden" name="aba" value="turma">
+                <input type="hidden" name="data" value="{{ inicio_semana|date:'Y-m-d' }}">
+                
                 <label for="turma" style="font-weight: bold; color: #2c3e50;">Selecione a Turma para analisar:</label>
                 <select name="turma" id="turma" required style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; flex-grow: 1; max-width: 400px;">
                     <option value="">-- Escolha uma das suas turmas --</option>
@@ -64,24 +83,50 @@
                                 
                                 {% if aba_ativa == 'pessoal' %}
                                     {% if chave in grade_pessoal_map %}
-                                        <div class="card-aula" onclick="abrirAcaoAula('{{ grade_pessoal_map|get_item:chave|get_item:'id' }}', '{{ grade_pessoal_map|get_item:chave|get_item:'disciplina' }}', '{{ grade_pessoal_map|get_item:chave|get_item:'turma' }}')">
-                                            <strong style="display: block; color: #16a085;">{{ grade_pessoal_map|get_item:chave|get_item:'disciplina' }}</strong>
-                                            <span style="color: #2c3e50;">{{ grade_pessoal_map|get_item:chave|get_item:'turma' }}</span>
+                                        {% with aula=grade_pessoal_map|get_item:chave %}
+                                        
+                                        <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ aula|get_item:'turma' }}')">
+                                            <strong style="display: block; color: #16a085;">{{ aula|get_item:'disciplina' }}</strong>
+                                            <span style="color: #2c3e50;">{{ aula|get_item:'turma' }}</span>
+                                            
+                                            {% if aula|get_item:'info_extra' %}
+                                                <span style="font-size: 0.85em; color: #d35400; font-weight: bold; display: block; margin-top: 5px;">
+                                                    ⚠️ {{ aula|get_item:'info_extra' }}
+                                                </span>
+                                            {% endif %}
                                         </div>
+                                        
+                                        {% endwith %}
                                     {% endif %}
                                 
                                 {% elif aba_ativa == 'turma' and chave in grade_turma_map %}
-                                    {% if grade_turma_map|get_item:chave|get_item:'is_minha_aula' %}
-                                        <div class="card-aula" onclick="abrirAcaoAula('{{ grade_turma_map|get_item:chave|get_item:'id' }}', '{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}', '{{ turma_selecionada.nome }}')" title="Sua Aula - Clique para trocar">
-                                            <strong style="display: block; color: #16a085;">{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}</strong>
-                                            <span style="color: #2c3e50; font-size: 0.9em;">(Você)</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="card-colega" title="Aula de {{ grade_turma_map|get_item:chave|get_item:'professor' }}">
-                                            <strong style="display: block;">{{ grade_turma_map|get_item:chave|get_item:'disciplina' }}</strong>
-                                            <span>{{ grade_turma_map|get_item:chave|get_item:'professor'|truncatechars:15 }}</span>
-                                        </div>
-                                    {% endif %}
+                                    {% with aula=grade_turma_map|get_item:chave %}
+                                        
+                                        {% if aula|get_item:'is_minha_aula' %}
+                                            <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ turma_selecionada.nome }}')" title="Sua Aula - Clique para trocar">
+                                                <strong style="display: block; color: #16a085;">{{ aula|get_item:'disciplina' }}</strong>
+                                                <span style="color: #2c3e50; font-size: 0.9em;">(Você)</span>
+                                                
+                                                {% if aula|get_item:'info_extra' %}
+                                                    <span style="font-size: 0.85em; color: #d35400; font-weight: bold; display: block; margin-top: 5px;">
+                                                        ⚠️ {{ aula|get_item:'info_extra' }}
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <div class="card-colega" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7; color: #2c3e50;{% endif %}" title="Aula de {{ aula|get_item:'professor' }}">
+                                                <strong style="display: block;">{{ aula|get_item:'disciplina' }}</strong>
+                                                <span>{{ aula|get_item:'professor'|truncatechars:15 }}</span>
+                                                
+                                                {% if aula|get_item:'info_extra' %}
+                                                    <span style="font-size: 0.85em; color: #d35400; font-weight: bold; display: block; margin-top: 5px;">
+                                                        ⚠️ {{ aula|get_item:'info_extra' }}
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                    {% endwith %}
                                 {% endif %}
 
                             {% endwith %}
@@ -102,6 +147,7 @@
         <div style="display: flex; flex-direction: column; gap: 10px;">
             <button onclick="redirecionarSolicitacao('P')" style="padding: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 Solicitar Permuta</button>
             <button onclick="redirecionarSolicitacao('S')" style="padding: 12px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">👤 Solicitar Substituição</button>
+            <button onclick="redirecionarSolicitacao('L')" style="padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">⚠️ Irei Faltar</button>
             <button onclick="fecharModal()" style="padding: 12px; background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Cancelar</button>
         </div>
     </div>
