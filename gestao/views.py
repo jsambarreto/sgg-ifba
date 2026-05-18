@@ -13,7 +13,8 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.core.mail import send_mail 
-from django.conf import settings       
+from django.conf import settings  
+from django.db.models import Q     
 
 @login_required
 def exibir_grade(request):
@@ -555,4 +556,109 @@ def api_informar_pagamento(request):
             return JsonResponse({'sucesso': True, 'mensagem': 'Pagamento registrado com sucesso!'})
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
+
+
+@login_required
+@apenas_coordenadores
+@apenas_gestores
+def simulador_grade(request):
+    """
+    Renderiza a interface de arrastar e soltar para os coordenadores.
+    """
+    turmas = Turma.objects.all().order_by('nome')
+    professores = Professor.objects.all().order_by('nome_completo')
+    horarios = Horario.objects.all().order_by('dia_semana', 'hora_inicio')
+    
+    # Para o Drag and Drop funcionar, precisamos de uma visão em matriz da escola inteira
+    grade_completa = GradeHoraria.objects.select_related('turma', 'horario', 'disciplina', 'professor').all()
+    
+    # Horários únicos para o cabeçalho da tabela
+    horarios_unicos = Horario.objects.all().order_by('hora_inicio').values_list('hora_inicio', flat=True).distinct()
+    slots_horarios = [h.strftime('%H:%M') for h in horarios_unicos]
+
+    contexto = {
+        'turmas': turmas,
+        'professores': professores,
+        'dias_semana': [2, 3, 4, 5, 6],
+        'slots_horarios': slots_horarios,
+        'grade_completa': grade_completa,
+    }
+    return render(request, 'gestao/simulador_grade.html', contexto)
+
+@login_required
+@apenas_coordenadores
+def api_verificar_movimento(request):
+    """
+    Recebe o movimento do Drag-and-Drop via JavaScript, calcula os choques 
+    e devolve sugestões antes de salvar.
+    """
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            grade_id = dados.get('grade_id') # A aula que está sendo arrastada
+            novo_horario_id = dados.get('novo_horario_id')
+            nova_turma_id = dados.get('nova_turma_id')
+
+            aula_movida = get_object_or_404(GradeHoraria, id=grade_id)
+            novo_horario = get_object_or_404(Horario, id=novo_horario_id)
+            nova_turma = get_object_or_404(Turma, id=nova_turma_id)
+            professor = aula_movida.professor
+
+            resultado = {
+                'permitido': True,
+                'choques': [],
+                'sugestoes': []
+            }
+
+            # 1. VERIFICAÇÃO DE CHOQUE: O professor já dá aula neste horário noutra turma?
+            if professor:
+                choque_prof = GradeHoraria.objects.filter(
+                    professor=professor, 
+                    horario=novo_horario
+                ).exclude(id=aula_movida.id).first()
+
+                if choque_prof:
+                    resultado['permitido'] = False
+                    resultado['choques'].append({
+                        'tipo': 'Professor Ocupado',
+                        'mensagem': f"O Prof. {professor.nome_completo} já está na turma {choque_prof.turma.nome} neste horário."
+                    })
+
+            # 2. VERIFICAÇÃO DE CHOQUE: A turma de destino já tem aula neste horário?
+            choque_turma = GradeHoraria.objects.filter(
+                turma=nova_turma, 
+                horario=novo_horario
+            ).exclude(id=aula_movida.id).first()
+
+            if choque_turma:
+                resultado['permitido'] = False
+                resultado['choques'].append({
+                    'tipo': 'Turma Ocupada',
+                    'mensagem': f"A turma {nova_turma.nome} já tem aula de {choque_turma.disciplina.nome} com {choque_turma.professor.nome_completo if choque_turma.professor else 'Sem Prof'}."
+                })
+
+            # 3. MOTOR DE SUGESTÕES (Se houver choque, procurar horários livres)
+            if not resultado['permitido']:
+                # Pega todos os horários permitidos para a turma
+                horarios_possiveis = nova_turma.horarios_permitidos.all()
+                
+                for hp in horarios_possiveis:
+                    # Verifica se a turma está livre E se o professor está livre neste horário 'hp'
+                    turma_livre = not GradeHoraria.objects.filter(turma=nova_turma, horario=hp).exists()
+                    prof_livre = not GradeHoraria.objects.filter(professor=professor, horario=hp).exists() if professor else True
+                    
+                    if turma_livre and prof_livre:
+                        resultado['sugestoes'].append({
+                            'horario_id': hp.id,
+                            'texto': f"{hp.get_dia_semana_display()} às {hp.hora_inicio.strftime('%H:%M')}"
+                        })
+                        if len(resultado['sugestoes']) >= 3: # Limita a 3 sugestões para não poluir a tela
+                            break
+
+            return JsonResponse(resultado)
+
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})

@@ -1,0 +1,252 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+<style>
+    .simulador-container { display: flex; gap: 20px; margin-top: 20px; font-family: sans-serif; }
+    .painel-principal { flex: 3; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .painel-lateral { flex: 1; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; display: flex; flex-direction: column; gap: 15px; min-width: 300px; }
+    
+    .grid-simulador { width: 100%; border-collapse: collapse; text-align: center; margin-top: 15px; table-layout: fixed; }
+    .grid-simulador th { background-color: #2c3e50; color: white; padding: 12px; border: 1px solid #bdc3c7; }
+    .grid-simulador td { padding: 10px; border: 1px solid #bdc3c7; background: #ffffff; vertical-align: top; height: 90px; transition: background 0.2s; }
+    
+    /* Zonas de Drop quando um card está por cima */
+    .dropzone-hover { background: #e8f4f8 !important; border: 2px dashed #3498db !important; }
+    
+    /* Estilização dos Cards Arrastáveis */
+    .card-simulacao { background: #e8f8f5; border: 1px solid #1abc9c; padding: 10px; border-radius: 4px; font-size: 0.85em; cursor: grab; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: opacity 0.2s; }
+    .card-simulacao:active { cursor: grabbing; opacity: 0.5; }
+    
+    /* Alertas e Sugestões */
+    .alerta-box { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 4px; color: #c0392b; font-size: 0.9em; margin-bottom: 10px; }
+    .sugestao-box { background: #eafaf1; border-left: 4px solid #2ecc71; padding: 12px; border-radius: 4px; color: #27ae60; font-size: 0.9em; }
+    .sugestao-item { display: block; background: white; border: 1px solid #2ecc71; padding: 6px; margin-top: 5px; border-radius: 4px; font-weight: bold; text-align: center; cursor: pointer; transition: 0.2s; }
+    .sugestao-item:hover { background: #2ecc71; color: white; }
+    
+    .badge-status { padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; display: inline-block; margin-bottom: 10px; }
+    .status-limpo { background: #d4edda; color: #155724; }
+    .status-conflito { background: #f8d7da; color: #721c24; }
+</style>
+
+<div class="simulador-container">
+    
+    <div class="painel-principal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="color: #2c3e50; margin: 0;">🛠️ Simulador Dinâmico de Grade</h2>
+            <div>
+                <label for="filtraTurma" style="font-weight: bold; color: #2c3e50; margin-right: 10px;">Analisar Turma:</label>
+                <select id="filtraTurma" onchange="renderizarGradeSimulada()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 250px;">
+                    <option value="">-- Escolha uma Turma --</option>
+                    {% for t in turmas %}
+                        <option value="{{ t.id }}">{{ t.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div id="avisoSelecao" style="text-align: center; padding: 60px; color: #7f8c8d; border: 2px dashed #eee; border-radius: 6px;">
+            Selecione uma turma no canto superior direito para carregar a matriz de simulação e iniciar os testes de movimentação.
+        </div>
+
+        <table id="tabelaSimulador" class="grid-simulador" style="display: none;">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">Horário</th>
+                    <th style="width: 17.6%;">Segunda</th>
+                    <th style="width: 17.6%;">Terça</th>
+                    <th style="width: 17.6%;">Quarta</th>
+                    <th style="width: 17.6%;">Quinta</th>
+                    <th style="width: 17.6%;">Sexta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hora in slots_horarios %}
+                <tr>
+                    <td style="font-weight: bold; background: #ecf0f1; vertical-align: middle; height: auto;">{{ hora }}</td>
+                    {% for dia in dias_semana %}
+                        <td id="cell-{{ dia }}-{{ hora }}" 
+                            ondragover="allowDrop(event)" 
+                            ondragleave="dragLeave(event)" 
+                            ondrop="drop(event, {{ dia }}, '{{ hora }}')">
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="painel-lateral">
+        <h3 style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 8px;">🔍 Diagnóstico</h3>
+        
+        <div>
+            <span style="font-size: 0.85em; color: #7f8c8d; display: block; margin-bottom: 2px;">Estado Atual da Simulação:</span>
+            <div id="statusSimulacao" class="badge-status status-limpo">Nenhum conflito detetado</div>
+        </div>
+
+        <div id="painelErros" style="flex-grow: 1; overflow-y: auto;">
+            <p style="color: #7f8c8d; font-size: 0.9em; text-align: center; margin-top: 20px;">Mova qualquer disciplina para verificar automaticamente choques de professores ou salas.</p>
+        </div>
+
+        <div id="painelSugestoes" style="display: none;">
+            <h4 style="color: #27ae60; margin: 10px 0 5px 0;">💡 Alternativas Livres:</h4>
+            <div id="listaSugestoes"></div>
+        </div>
+        
+        <button onclick="location.reload()" style="padding: 12px; background: #e67e22; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%;">🔄 Resetar Simulação</button>
+    </div>
+</div>
+
+<script>
+    // Mapeamento dos horários do banco para id de controle do JS
+    const mapaHorarios = {
+        {% for h in grade_completa %}
+            "{{ h.horario.dia_semana }}-{{ h.horario.hora_inicio|time:'H:i' }}": "{{ h.horario.id }}",
+        {% endfor %}
+    };
+
+    // Coleção completa das aulas da instituição em estado de memória livre (Simulação)
+    let estadoGrade = [
+        {% for item in grade_completa %}
+        {
+            id: "{{ item.id }}",
+            turmaId: "{{ item.turma.id }}",
+            horarioId: "{{ item.horario.id }}",
+            diaSemana: {{ item.horario.dia_semana }},
+            horaInicio: "{{ item.horario.hora_inicio|time:'H:i' }}",
+            disciplina: "{{ item.disciplina.nome|default:'---' }}",
+            professor: "{{ item.professor.nome_completo|default:'Sem Prof.' }}"
+        },
+        {% endfor %}
+    ];
+
+    // Variáveis de controle para o Drag and Drop
+    let cardArrastadoId = null;
+
+    function renderizarGradeSimulada() {
+        const turmaId = document.getElementById('filtraTurma').value;
+        const tabela = document.getElementById('tabelaSimulador');
+        const aviso = document.getElementById('avisoSelecao');
+        
+        if (!turmaId) {
+            tabela.style.display = 'none';
+            aviso.style.display = 'block';
+            return;
+        }
+        
+        tabela.style.display = 'table';
+        aviso.style.display = 'none';
+
+        // Limpa todas as células antes de redesenhar
+        document.querySelectorAll('.grid-simulador td[id^="cell-"]').forEach(td => td.innerHTML = '');
+
+        // Filtra e injeta os cards apenas da turma selecionada
+        const aulasTurma = estadoGrade.filter(a => a.turmaId === turmaId);
+        
+        aulasTurma.forEach(aula => {
+            const cellId = `cell-${aula.diaSemana}-${aula.horaInicio}`;
+            const celulaTarget = document.getElementById(cellId);
+            
+            if (celulaTarget) {
+                const card = document.createElement('div');
+                card.className = 'card-simulacao';
+                card.id = `card-${aula.id}`;
+                card.draggable = true;
+                card.innerHTML = `<strong>${aula.disciplina}</strong><br><span style="color:#555;">${aula.professor}</span>`;
+                
+                // Eventos nativos de arrastar do HTML5
+                card.addEventListener('dragstart', (e) => {
+                    cardArrastadoId = aula.id;
+                    e.dataTransfer.setData('text/plain', aula.id);
+                });
+                
+                celulaTarget.appendChild(card);
+            }
+        });
+    }
+
+    // Controle de entrada e saída visual das zonas de drop
+    function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('dropzone-hover'); }
+    function dragLeave(e) { e.currentTarget.classList.remove('dropzone-hover'); }
+
+    function drop(e, diaDestino, horaDestino) {
+        e.preventDefault();
+        const celula = e.currentTarget;
+        celula.classList.remove('dropzone-hover');
+        
+        const keyHorario = `${diaDestino}-${horaDestino}`;
+        const novoHorarioId = mapaHorarios[keyHorario];
+        const novaTurmaId = document.getElementById('filtraTurma').value;
+        
+        if (!novoHorarioId || !cardArrastadoId) return;
+
+        // Faz a consulta em tempo real à API de choques que criamos no views.py
+        fetch('/api/simular-movimento/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                'grade_id': cardArrastadoId,
+                'novo_horario_id': novoHorarioId,
+                'nova_turma_id': novaTurmaId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            processarResultadoSimulacao(data, diaDestino, horaDestino);
+        });
+    }
+
+    function processarResultadoSimulacao(data, diaDestino, horaDestino) {
+        const statusBox = document.getElementById('statusSimulacao');
+        const painelErros = document.getElementById('painelErros');
+        const painelSugestoes = document.getElementById('painelSugestoes');
+        const listaSugestoes = document.getElementById('listaSugestoes');
+
+        if (data.permitido) {
+            // Movimento limpo: Atualiza o estado em memória e redesenha a tela
+            const index = estadoGrade.findIndex(a => a.id === cardArrastadoId);
+            if (index !== -1) {
+                estadoGrade[index].diaSemana = diaDestino;
+                estadoGrade[index].horaInicio = horaDestino;
+            }
+            
+            statusBox.className = "badge-status status-limpo";
+            statusBox.innerText = "Movimento permitido";
+            painelErros.innerHTML = '<p style="color:#27ae60; text-align:center;">Grade atualizada na simulação sem gerar conflitos.</p>';
+            painelSugestoes.style.display = 'none';
+            
+            renderizarGradeSimulada();
+        } else {
+            // Movimento gerou choque: Bloqueia e expõe rastreabilidade das turmas afetadas
+            statusBox.className = "badge-status status-conflito";
+            statusBox.innerText = "Choque Detetado!";
+            
+            painelErros.innerHTML = '';
+            data.choques.forEach(c => {
+                const errDiv = document.createElement('div');
+                errDiv.className = 'alerta-box';
+                errDiv.innerHTML = `<strong>${c.tipo}</strong><br>${c.mensagem}`;
+                painelErros.appendChild(errDiv);
+            });
+
+            // Aloca as sugestões inteligentes dadas pelo algoritmo do backend
+            listaSugestoes.innerHTML = '';
+            if (data.sugestoes.length > 0) {
+                painelSugestoes.style.display = 'block';
+                data.sugestoes.forEach(s => {
+                    const sugBtn = document.createElement('span');
+                    sugBtn.className = 'sugestao-item';
+                    sugBtn.innerText = s.texto;
+                    listaSugestoes.appendChild(sugBtn);
+                });
+            } else {
+                painelSugestoes.style.display = 'none';
+            }
+        }
+        cardArrastadoId = null;
+    }
+</script>
+{% endblock %}
