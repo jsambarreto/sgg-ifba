@@ -14,7 +14,22 @@
     .dropzone-hover { background: #e8f4f8 !important; border: 2px dashed #3498db !important; }
     
     /* Estilização dos Cards Arrastáveis */
-    .card-simulacao { background: #e8f8f5; border: 1px solid #1abc9c; padding: 10px; border-radius: 4px; font-size: 0.85em; cursor: grab; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: opacity 0.2s; }
+    .card-simulacao {
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        cursor: grab;
+        user-select: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: opacity 0.2s;
+        
+        /* SOLUÇÃO PARA CONTROLE DE TEXTO */
+        word-break: break-word;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+    }
     .card-simulacao:active { cursor: grabbing; opacity: 0.5; }
     
     /* Alertas e Sugestões */
@@ -98,6 +113,17 @@
 </div>
 
 <script>
+    // Gera uma cor pastel única e estável baseada em qualquer texto recebido
+    function obterCorPorPar(professor, disciplina) {
+        const textoCombinado = professor + disciplina;
+        let hash = 0;
+        for (let i = 0; i < textoCombinado.length; i++) {
+            hash = textoCombinado.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        // Mantém a matiz livre (0-360), Saturação estável em 65% e Luminosidade alta (88%) para tom pastel
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 65%, 88%)`;
+    }
     // Mapeamento dos horários do banco para id de controle do JS
     const mapaHorarios = {
         {% for h in grade_completa %}
@@ -152,6 +178,10 @@
                 card.className = 'card-simulacao';
                 card.id = `card-${aula.id}`;
                 card.draggable = true;
+                // GERAÇÃO DA COR AUTOMÁTICA SE NÃO HOUVER SOBREPOSIÇÃO DE STATUS DE ERRO
+                const corBase = obterCorPorPar(aula.professor, aula.disciplina);
+                card.style.backgroundColor = corBase;
+                card.style.borderColor = 'rgba(0,0,0,0.1)';
                 card.innerHTML = `<strong>${aula.disciplina}</strong><br><span style="color:#555;">${aula.professor}</span>`;
                 
                 // Eventos nativos de arrastar do HTML5
@@ -206,21 +236,40 @@
         const listaSugestoes = document.getElementById('listaSugestoes');
 
         if (data.permitido) {
-            // Movimento limpo: Atualiza o estado em memória e redesenha a tela
-            const index = estadoGrade.findIndex(a => a.id === cardArrastadoId);
-            if (index !== -1) {
-                estadoGrade[index].diaSemana = diaDestino;
-                estadoGrade[index].horaInicio = horaDestino;
+            // Localiza quem foi arrastado
+            const indexOrigem = estadoGrade.findIndex(a => a.id === cardArrastadoId);
+            const aulaOrigem = estadoGrade[indexOrigem];
+
+            // SE FOI UMA PERMUTA (SWAP)
+            if (data.is_permuta) {
+                // Localiza quem já estava na célula de destino antes da troca
+                const indexDestino = estadoGrade.findIndex(a => 
+                    a.turmaId === document.getElementById('filtraTurma').value &&
+                    a.diaSemana == diaDestino &&
+                    a.horaInicio === horaDestino
+                );
+
+                if (indexDestino !== -1) {
+                    // Manda o Professor Y para o horário antigo do Professor X
+                    estadoGrade[indexDestino].diaSemana = aulaOrigem.diaSemana;
+                    estadoGrade[indexDestino].horaInicio = aulaOrigem.horaInicio;
+                }
             }
+
+            // Manda o Professor X (arrastado) para o novo destino
+            aulaOrigem.diaSemana = diaDestino;
+            aulaOrigem.horaInicio = horaDestino;
             
+            // Atualiza o painel visual
             statusBox.className = "badge-status status-limpo";
-            statusBox.innerText = "Movimento permitido";
-            painelErros.innerHTML = '<p style="color:#27ae60; text-align:center;">Grade atualizada na simulação sem gerar conflitos.</p>';
+            statusBox.innerText = "Movimento aprovado";
+            painelErros.innerHTML = `<p style="color:#27ae60; text-align:center; font-weight:bold;">${data.mensagem_sucesso}</p>`;
             painelSugestoes.style.display = 'none';
             
+            // Redesenha a grade com as novas posições
             renderizarGradeSimulada();
         } else {
-            // Movimento gerou choque: Bloqueia e expõe rastreabilidade das turmas afetadas
+            // Movimento gerou choque de horário
             statusBox.className = "badge-status status-conflito";
             statusBox.innerText = "Choque Detetado!";
             
@@ -232,9 +281,8 @@
                 painelErros.appendChild(errDiv);
             });
 
-            // Aloca as sugestões inteligentes dadas pelo algoritmo do backend
             listaSugestoes.innerHTML = '';
-            if (data.sugestoes.length > 0) {
+            if (data.sugestoes && data.sugestoes.length > 0) {
                 painelSugestoes.style.display = 'block';
                 data.sugestoes.forEach(s => {
                     const sugBtn = document.createElement('span');

@@ -8,10 +8,40 @@
     .aba-btn:hover { color: #2c3e50; }
     .aba-btn.ativa { color: #2ecc71; border-bottom-color: #2ecc71; }
     
-    .card-aula { background: #e8f8f5; border: 1px solid #1abc9c; padding: 10px; border-radius: 4px; font-size: 0.85em; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(26, 188, 156, 0.2); }
+    .card-aula { 
+        background: #e8f8f5; 
+        border: 1px solid #1abc9c; 
+        padding: 10px; 
+        border-radius: 4px; 
+        font-size: 0.85em; 
+        cursor: pointer; 
+        transition: 0.2s; 
+        box-shadow: 0 2px 4px rgba(26, 188, 156, 0.2); 
+        
+        /* SOLUÇÃO PARA CONTROLE DE TEXTO */
+        word-break: break-word;      /* Força a quebra de palavras longas */
+        overflow: hidden;            /* Oculta o excedente */
+        display: -webkit-box;
+        -webkit-line-clamp: 4;       /* Limita o card a no máximo 4 linhas de texto */
+        -webkit-box-orient: vertical;
+    }
     .card-aula:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(26, 188, 156, 0.3); }
     
-    .card-colega { background: #f8f9fa; border: 1px dashed #bdc3c7; padding: 10px; border-radius: 4px; font-size: 0.85em; color: #7f8c8d; }
+    .card-colega { 
+            background: #f8f9fa; 
+            border: 1px dashed #bdc3c7; 
+            padding: 10px; 
+            border-radius: 4px; 
+            font-size: 0.85em; 
+            color: #7f8c8d; 
+            
+            /* SOLUÇÃO PARA CONTROLE DE TEXTO */
+            word-break: break-word;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+    }
     
     .nav-semana { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
     .btn-nav { background: white; border: 1px solid #bdc3c7; padding: 8px 15px; border-radius: 4px; color: #2c3e50; text-decoration: none; font-weight: bold; transition: 0.2s; }
@@ -160,6 +190,31 @@
 </div>
 
 <script>
+    // Reaplica a mesma função de hash para manter a identidade visual unificada
+    function aplicarCresPorPar() {
+        document.querySelectorAll('.card-aula, .card-colega').forEach(card => {
+            // Se o card já recebeu uma cor de alerta/status do backend (como vermelho de falta), respeita a cor existente
+            if (card.style.backgroundColor && card.style.backgroundColor !== 'transparent' && !card.style.backgroundColor.includes('rgb(232, 248, 245)')) {
+                return; 
+            }
+            
+            const texto = card.innerText; // Lê o conteúdo interno do card
+            let hash = 0;
+            for (let i = 0; i < texto.length; i++) {
+                hash = texto.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            const corPastel = `hsl(${hue}, 65%, 90%)`;
+            
+            card.style.backgroundColor = corPastel;
+            card.style.borderColor = `hsl(${hue}, 50%, 75%)`;
+        });
+    }
+
+    // Executa a pintura assim que a página terminar de carregar
+    window.addEventListener('DOMContentLoaded', aplicarCresPorPar);
+
+
     let aulaSelecionadaId = null;
 
     function abrirAcaoAula(aulaId, disciplina, turma) {

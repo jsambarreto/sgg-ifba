@@ -589,72 +589,101 @@ def simulador_grade(request):
 @login_required
 @apenas_coordenadores
 def api_verificar_movimento(request):
-    """
-    Recebe o movimento do Drag-and-Drop via JavaScript, calcula os choques 
-    e devolve sugestões antes de salvar.
-    """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            grade_id = dados.get('grade_id') # A aula que está sendo arrastada
-            novo_horario_id = dados.get('novo_horario_id')
-            nova_turma_id = dados.get('nova_turma_id')
+            grade_id = dados.get('grade_id') # Aula sendo arrastada (Prof X)
+            novo_horario_id = dados.get('novo_horario_id') # Horário de destino
+            nova_turma_id = dados.get('nova_turma_id') # Turma atual
 
             aula_movida = get_object_or_404(GradeHoraria, id=grade_id)
             novo_horario = get_object_or_404(Horario, id=novo_horario_id)
             nova_turma = get_object_or_404(Turma, id=nova_turma_id)
-            professor = aula_movida.professor
+            
+            # Guarda o horário de onde o Prof X saiu
+            horario_antigo = aula_movida.horario
+            prof_x = aula_movida.professor
 
             resultado = {
                 'permitido': True,
+                'is_permuta': False,
                 'choques': [],
-                'sugestoes': []
+                'sugestoes': [],
+                'mensagem_sucesso': ''
             }
 
-            # 1. VERIFICAÇÃO DE CHOQUE: O professor já dá aula neste horário noutra turma?
-            if professor:
-                choque_prof = GradeHoraria.objects.filter(
-                    professor=professor, 
-                    horario=novo_horario
-                ).exclude(id=aula_movida.id).first()
+            # Verifica se já existe uma aula no destino que o Prof X quer ocupar
+            aula_destino = GradeHoraria.objects.filter(turma=nova_turma, horario=novo_horario).first()
 
-                if choque_prof:
-                    resultado['permitido'] = False
-                    resultado['choques'].append({
-                        'tipo': 'Professor Ocupado',
-                        'mensagem': f"O Prof. {professor.nome_completo} já está na turma {choque_prof.turma.nome} neste horário."
-                    })
+            if aula_destino:
+                # ========================================================
+                # CENÁRIO 1: É UMA TENTATIVA DE PERMUTA (SWAP)
+                # ========================================================
+                resultado['is_permuta'] = True
+                prof_y = aula_destino.professor
 
-            # 2. VERIFICAÇÃO DE CHOQUE: A turma de destino já tem aula neste horário?
-            choque_turma = GradeHoraria.objects.filter(
-                turma=nova_turma, 
-                horario=novo_horario
-            ).exclude(id=aula_movida.id).first()
-
-            if choque_turma:
-                resultado['permitido'] = False
-                resultado['choques'].append({
-                    'tipo': 'Turma Ocupada',
-                    'mensagem': f"A turma {nova_turma.nome} já tem aula de {choque_turma.disciplina.nome} com {choque_turma.professor.nome_completo if choque_turma.professor else 'Sem Prof'}."
-                })
-
-            # 3. MOTOR DE SUGESTÕES (Se houver choque, procurar horários livres)
-            if not resultado['permitido']:
-                # Pega todos os horários permitidos para a turma
-                horarios_possiveis = nova_turma.horarios_permitidos.all()
-                
-                for hp in horarios_possiveis:
-                    # Verifica se a turma está livre E se o professor está livre neste horário 'hp'
-                    turma_livre = not GradeHoraria.objects.filter(turma=nova_turma, horario=hp).exists()
-                    prof_livre = not GradeHoraria.objects.filter(professor=professor, horario=hp).exists() if professor else True
+                # 1. Verifica se o Prof X pode ir para o novo horário
+                if prof_x:
+                    choque_x = GradeHoraria.objects.filter(
+                        professor=prof_x, horario=novo_horario
+                    ).exclude(id=aula_movida.id).first()
                     
-                    if turma_livre and prof_livre:
-                        resultado['sugestoes'].append({
-                            'horario_id': hp.id,
-                            'texto': f"{hp.get_dia_semana_display()} às {hp.hora_inicio.strftime('%H:%M')}"
+                    if choque_x:
+                        resultado['permitido'] = False
+                        resultado['choques'].append({
+                            'tipo': f'Choque: Prof. {prof_x.nome_completo.split()[0]}',
+                            'mensagem': f"Já leciona '{choque_x.disciplina.nome}' na turma {choque_x.turma.nome}."
                         })
-                        if len(resultado['sugestoes']) >= 3: # Limita a 3 sugestões para não poluir a tela
-                            break
+
+                # 2. Verifica se o Prof Y pode ir para o horário antigo do Prof X
+                if prof_y:
+                    choque_y = GradeHoraria.objects.filter(
+                        professor=prof_y, horario=horario_antigo
+                    ).exclude(id=aula_destino.id).first()
+                    
+                    if choque_y:
+                        resultado['permitido'] = False
+                        resultado['choques'].append({
+                            'tipo': f'Choque: Prof. {prof_y.nome_completo.split()[0]}',
+                            'mensagem': f"Já leciona '{choque_y.disciplina.nome}' na turma {choque_y.turma.nome} no horário original de troca."
+                        })
+
+                if resultado['permitido']:
+                    nome_x = prof_x.nome_completo.split()[0] if prof_x else 'Sem Prof'
+                    nome_y = prof_y.nome_completo.split()[0] if prof_y else 'Sem Prof'
+                    resultado['mensagem_sucesso'] = f"Permuta simulada com sucesso entre {nome_x} e {nome_y}!"
+
+            else:
+                # ========================================================
+                # CENÁRIO 2: MOVIMENTO PARA HORÁRIO VAZIO
+                # ========================================================
+                if prof_x:
+                    choque_x = GradeHoraria.objects.filter(
+                        professor=prof_x, horario=novo_horario
+                    ).exclude(id=aula_movida.id).first()
+
+                    if choque_x:
+                        resultado['permitido'] = False
+                        resultado['choques'].append({
+                            'tipo': f'Choque: Prof. {prof_x.nome_completo.split()[0]}',
+                            'mensagem': f"Já está na turma {choque_x.turma.nome} neste horário."
+                        })
+
+                if resultado['permitido']:
+                    resultado['mensagem_sucesso'] = "Aula movida para horário livre com sucesso!"
+                else:
+                    # Gera sugestões apenas para movimentos simples (vazios)
+                    horarios_possiveis = nova_turma.horarios_permitidos.all()
+                    for hp in horarios_possiveis:
+                        turma_livre = not GradeHoraria.objects.filter(turma=nova_turma, horario=hp).exists()
+                        prof_livre = not GradeHoraria.objects.filter(professor=prof_x, horario=hp).exists() if prof_x else True
+                        if turma_livre and prof_livre:
+                            resultado['sugestoes'].append({
+                                'horario_id': hp.id,
+                                'texto': f"{hp.get_dia_semana_display()} às {hp.hora_inicio.strftime('%H:%M')}"
+                            })
+                            if len(resultado['sugestoes']) >= 3:
+                                break
 
             return JsonResponse(resultado)
 
