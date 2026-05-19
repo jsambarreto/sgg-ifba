@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: a4; margin: 20mm 15mm; }
+        body { font-family: sans-serif; color: #2c3e50; font-size: 11pt; line-height: 1.5; }
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; }
+        .titulo { font-size: 15pt; font-weight: bold; color: #2c3e50; margin: 8px 0; uppercase; }
+        .subtitulo { font-size: 10pt; color: #7f8c8d; font-weight: normal; }
+        .secao { margin-top: 25px; margin-bottom: 10px; font-size: 12pt; font-weight: bold; color: #2c3e50; border-left: 4px solid #e67e22; padding-left: 8px; background: #fdf2e9; padding-top: 2px; padding-bottom: 2px; }
+        .tabela { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; text-align: center; table-layout: fixed; }
+        .tabela th { background-color: #2c3e50; color: white; padding: 8px; border: 1px solid #bdc3c7; }
+        .tabela td { padding: 8px; border: 1px solid #bdc3c7; background: #fff; vertical-align: middle; height: 45px; }
+        .lista-alteracoes { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }
+        .lista-alteracoes th { background-color: #f4f6f7; text-align: left; padding: 10px; border-bottom: 2px solid #bdc3c7; color: #2c3e50; }
+        .lista-alteracoes td { padding: 10px; border-bottom: 1px solid #e5e7e9; }
+        .badge-mudanca { color: #c0392b; font-weight: bold; }
+        .badge-sucesso { color: #27ae60; font-weight: bold; }
+        .footer-sei { margin-top: 50px; border-top: 1px dashed #bdc3c7; padding-top: 15px; font-size: 8.5pt; color: #7f8c8d; text-align: center; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    {% load custom_filters %}
+    <div class="header">
+        <strong>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DA BAHIA</strong><br>
+        <span class="subtitulo">Campus Euclides da Cunha | Sistema de Gestão de Grades (SGG)</span>
+        <div class="titulo">Relatório de Proposta de Alteração de Grade Horária</div>
+        <span class="subtitulo">Documento Técnico Pericial - Anexo de Instrução Processual (SEI)</span>
+    </div>
+
+    <table style="width: 100%; margin-bottom: 15px; font-size: 10.5pt;">
+        <tr>
+            <td style="width: 60%;"><strong>Responsável:</strong> {{ coordenador.nome_completo }}</td>
+            <td style="width: 40%; text-align: right;"><strong>Data de Emissão:</strong> {{ data_geracao|date:"d/m/Y H:i" }}</td>
+        </tr>
+        <tr>
+            <td style="width: 60%;"><strong>Setor:</strong> Coordenação do Curso Técnico em Informática</td>
+            <td style="width: 40%; text-align: right;"><strong>Turma Proposta:</strong> {{ turma_nome }}</td>
+        </tr>
+    </table>
+
+    <div class="secao">1. Matriz de Distribuição Horária Proposta (Cenário Simulado)</div>
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th style="width: 12%;">Horário</th>
+                <th>Segunda</th>
+                <th>Terça</th>
+                <th>Quarta</th>
+                <th>Quinta</th>
+                <th>Sexta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for hora in slots_horarios %}
+            <tr>
+                <td style="font-weight: bold; background: #f8f9fa;">{{ hora }}</td>
+                {% for dia in dias_semana %}
+                    <td>
+                        {% with chave=dia|stringformat:"s"|add:"-"|add:hora %}
+                            {% if chave in grade_map %}
+                                {{ grade_map|get_item:chave|safe }}
+                            {% else %}
+                                <span style="color: #bdc3c7;">---</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="secao">2. Extrato Analítico de Modificações (Rastreabilidade de Impacto)</div>
+    {% if alteracoes %}
+        <table class="lista-alteracoes">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Componente Curricular / Docente</th>
+                    <th style="width: 65%;">Movimentação de Fluxo Identificada</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alt in alteracoes %}
+                <tr>
+                    <td><strong>{{ alt.disciplina }}</strong><br><span style="color: #555; font-size: 0.9em;">{{ alt.professor }}</span></td>
+                    <td style="vertical-align: middle;">
+                        Removido de <span class="badge-mudanca">{{ alt.de_dia }} às {{ alt.de_hora }}</span> <br>
+                        Alocado para <span class="badge-sucesso">➡️ {{ alt.para_dia }} às {{ alt.para_hora }}</span>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: #7f8c8d; font-style: italic; padding: 10px;">Nenhuma alteração de posicionamento físico foi realizada nesta simulação em relação à grade matriz homologada.</p>
+    {% endif %}
+
+    <div class="footer-sei">
+        Este documento é um extrato técnico de simulação gerado eletronicamente e de forma automatizada pelo SGG IFBA.<br>
+        As alterações propostas acima não possuem caráter impositivo imediato, servindo como peça instrutória para abertura e instrução de processo de alteração de grade horária no Sistema Eletrônico de Informações (SEI) sob a validação da Direção de Ensino.
+    </div>
+</body>
+</html>

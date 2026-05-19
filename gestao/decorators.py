@@ -19,3 +19,10 @@ def apenas_coordenadores(view_func):
             return view_func(request, *args, **kwargs)
         raise PermissionDenied("Acesso restrito à Coordenação.")
     return wrapper
+
+def apenas_diretores(view_func):
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_superuser or (hasattr(request.user, 'professor') and request.user.professor.is_diretor):
+            return view_func(request, *args, **kwargs)
+        raise PermissionDenied("Acesso restrito à Direção.")
+    return wrapper

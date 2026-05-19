@@ -5,7 +5,7 @@ from .models import GradeHoraria, Turma, Horario, Solicitacao, Professor, Discip
 from .services import gerar_grade_vazia_para_turma, processar_permuta, processar_acao_modal
 from django.db import transaction
 from datetime import datetime, timedelta, date
-from .decorators import apenas_coordenadores, apenas_gestores 
+from .decorators import apenas_coordenadores, apenas_gestores, apenas_diretores
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.core.exceptions import PermissionDenied
@@ -560,20 +560,21 @@ def api_informar_pagamento(request):
 
 
 @login_required
-@apenas_coordenadores
-@apenas_gestores
 def simulador_grade(request):
     """
-    Renderiza a interface de arrastar e soltar para os coordenadores.
+    Renderiza a interface de arrastar e soltar para os coordenadores e diretores.
     """
+    # TRAVA DE SEGURANÇA: Permite acesso a Coordenador, Diretor ou Superuser
+    prof = getattr(request.user, 'professor', None)
+    if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
+        raise PermissionDenied("Acesso restrito à Coordenação e Direção do Campus.")
+
     turmas = Turma.objects.all().order_by('nome')
     professores = Professor.objects.all().order_by('nome_completo')
     horarios = Horario.objects.all().order_by('dia_semana', 'hora_inicio')
     
-    # Para o Drag and Drop funcionar, precisamos de uma visão em matriz da escola inteira
     grade_completa = GradeHoraria.objects.select_related('turma', 'horario', 'disciplina', 'professor').all()
     
-    # Horários únicos para o cabeçalho da tabela
     horarios_unicos = Horario.objects.all().order_by('hora_inicio').values_list('hora_inicio', flat=True).distinct()
     slots_horarios = [h.strftime('%H:%M') for h in horarios_unicos]
 
@@ -585,22 +586,24 @@ def simulador_grade(request):
         'grade_completa': grade_completa,
     }
     return render(request, 'gestao/simulador_grade.html', contexto)
-
 @login_required
-@apenas_coordenadores
 def api_verificar_movimento(request):
+    # TRAVA DE SEGURANÇA PARA A API
+    prof = getattr(request.user, 'professor', None)
+    if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
+        return JsonResponse({'sucesso': False, 'erro': 'Acesso negado. Apenas coordenadores e diretores podem simular.'}, status=403)
+
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            grade_id = dados.get('grade_id') # Aula sendo arrastada (Prof X)
-            novo_horario_id = dados.get('novo_horario_id') # Horário de destino
-            nova_turma_id = dados.get('nova_turma_id') # Turma atual
+            grade_id = dados.get('grade_id') 
+            novo_horario_id = dados.get('novo_horario_id') 
+            nova_turma_id = dados.get('nova_turma_id') 
 
             aula_movida = get_object_or_404(GradeHoraria, id=grade_id)
             novo_horario = get_object_or_404(Horario, id=novo_horario_id)
             nova_turma = get_object_or_404(Turma, id=nova_turma_id)
             
-            # Guarda o horário de onde o Prof X saiu
             horario_antigo = aula_movida.horario
             prof_x = aula_movida.professor
 
@@ -612,17 +615,12 @@ def api_verificar_movimento(request):
                 'mensagem_sucesso': ''
             }
 
-            # Verifica se já existe uma aula no destino que o Prof X quer ocupar
             aula_destino = GradeHoraria.objects.filter(turma=nova_turma, horario=novo_horario).first()
 
             if aula_destino:
-                # ========================================================
-                # CENÁRIO 1: É UMA TENTATIVA DE PERMUTA (SWAP)
-                # ========================================================
                 resultado['is_permuta'] = True
                 prof_y = aula_destino.professor
 
-                # 1. Verifica se o Prof X pode ir para o novo horário
                 if prof_x:
                     choque_x = GradeHoraria.objects.filter(
                         professor=prof_x, horario=novo_horario
@@ -635,7 +633,6 @@ def api_verificar_movimento(request):
                             'mensagem': f"Já leciona '{choque_x.disciplina.nome}' na turma {choque_x.turma.nome}."
                         })
 
-                # 2. Verifica se o Prof Y pode ir para o horário antigo do Prof X
                 if prof_y:
                     choque_y = GradeHoraria.objects.filter(
                         professor=prof_y, horario=horario_antigo
@@ -654,9 +651,6 @@ def api_verificar_movimento(request):
                     resultado['mensagem_sucesso'] = f"Permuta simulada com sucesso entre {nome_x} e {nome_y}!"
 
             else:
-                # ========================================================
-                # CENÁRIO 2: MOVIMENTO PARA HORÁRIO VAZIO
-                # ========================================================
                 if prof_x:
                     choque_x = GradeHoraria.objects.filter(
                         professor=prof_x, horario=novo_horario
@@ -672,7 +666,6 @@ def api_verificar_movimento(request):
                 if resultado['permitido']:
                     resultado['mensagem_sucesso'] = "Aula movida para horário livre com sucesso!"
                 else:
-                    # Gera sugestões apenas para movimentos simples (vazios)
                     horarios_possiveis = nova_turma.horarios_permitidos.all()
                     for hp in horarios_possiveis:
                         turma_livre = not GradeHoraria.objects.filter(turma=nova_turma, horario=hp).exists()
@@ -691,3 +684,75 @@ def api_verificar_movimento(request):
             return JsonResponse({'sucesso': False, 'erro': str(e)})
 
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
+@login_required
+def exportar_pdf_simulacao(request):
+    # TRAVA DE SEGURANÇA PARA O PDF
+    prof = getattr(request.user, 'professor', None)
+    if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
+        return HttpResponse("Acesso restrito à Coordenação e Direção do Campus.", status=403)
+
+    if request.method == 'POST':
+        try:
+            dados_json = request.POST.get('estado_grade_json')
+            if not dados_json:
+                return HttpResponse("Dados da simulação não fornecidos.", status=400)
+            
+            estado_simulado = json.loads(dados_json)
+            
+            alteracoes = []
+            nomes_dias = {1: 'Domingo', 2: 'Segunda-feira', 3: 'Terça-feira', 4: 'Quarta-feira', 5: 'Quinta-feira', 6: 'Sexta-feira', 7: 'Sábado'}
+            
+            slots_horarios = sorted(list(set(item['horaInicio'] for item in estado_simulado)))
+            dias_semana = [2, 3, 4, 5, 6] 
+            
+            grade_map = {}
+            turma_nome = "Simulação"
+            
+            for item in estado_simulado:
+                turma_nome = item['turmaNome']
+                
+                aula_original = GradeHoraria.objects.select_related('horario', 'professor', 'disciplina').get(id=item['id'])
+                
+                dia_antigo = aula_original.horario.dia_semana
+                hora_antiga = aula_original.horario.hora_inicio.strftime('%H:%M')
+                
+                if int(item['diaSemana']) != dia_antigo or item['horaInicio'] != hora_antiga:
+                    alteracoes.append({
+                        'professor': item['professor'],
+                        'disciplina': item['disciplina'],
+                        'de_dia': nomes_dias.get(dia_antigo),
+                        'de_hora': hora_antiga,
+                        'para_dia': nomes_dias.get(int(item['diaSemana'])),
+                        'para_hora': item['horaInicio']
+                    })
+                
+                chave = f"{item['diaSemana']}-{item['horaInicio']}"
+                grade_map[chave] = f"<strong>{item['disciplina']}</strong><br><span style='color:#555;'>{item['professor']}</span>"
+            
+            # Ajuste de segurança: Passa o 'coordenador' correto para o template ou avisa que é Super User
+            contexto = {
+                'coordenador': prof if prof else request.user,
+                'data_geracao': datetime.now(),
+                'turma_nome': turma_nome,
+                'alteracoes': alteracoes,
+                'slots_horarios': slots_horarios,
+                'dias_semana': dias_semana,
+                'grade_map': grade_map
+            }
+            
+            template_path = 'gestao/pdf_simulacao.html'
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="SGG_PROPOSTA_SEI_{turma_nome.replace(" ", "_")}.pdf"'
+
+            template = get_template(template_path)
+            html = template.render(contexto)
+            
+            pisa_status = pisa.CreatePDF(html, dest=response)
+            if pisa_status.err:
+                return HttpResponse('Erro ao processar e renderizar o PDF da simulação.', status=500)
+            
+            return response
+        except Exception as e:
+            return HttpResponse(f"Erro interno no motor de PDF: {str(e)}", status=500)
+            
+    return HttpResponse("Método não permitido.", status=405)
