@@ -308,8 +308,12 @@ def construtor_grade(request):
             for item in grade:
                 chave = f"{item.horario.dia_semana}-{item.horario.hora_inicio.strftime('%H:%M')}"
                 grade_map[chave] = {
-                    'professores': [{'id': p.id, 'nome': p.nome_completo} for p in item.professores.all()],
-                    'disc': item.disciplina.nome if item.disciplina else "---"
+                    'disciplina_id': item.disciplina.id if item.disciplina else '',
+                    'disc': item.disciplina.nome if item.disciplina else "---",
+                    # Array com os IDs dos professores para marcar no modal
+                    'professores_ids': [p.id for p in item.professores.all()],
+                    # String pronta para exibição "Jorge / Aline"
+                    'professores_str': item.nomes_professores 
                 }
 
     return render(request, 'gestao/construtor.html', {

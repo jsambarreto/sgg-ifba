@@ -30,16 +30,8 @@
     }
     .card-simulacao:active { cursor: grabbing; opacity: 0.6; transform: scale(0.95); }
     
-    .card-em-choque {
-        border: 2px solid #e74c3c !important;
-        box-shadow: 0 0 10px rgba(231, 76, 60, 0.4) !important;
-        animation: piscar 2s infinite alternate;
-    }
-    
-    @keyframes piscar {
-        from { background-color: #fdedec; }
-        to { background-color: #fadbd8; }
-    }
+    .card-em-choque { border: 2px solid #e74c3c !important; box-shadow: 0 0 10px rgba(231, 76, 60, 0.4) !important; animation: piscar 2s infinite alternate; }
+    @keyframes piscar { from { background-color: #fdedec; } to { background-color: #fadbd8; } }
     
     .alerta-box { background: white; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #c0392b; font-size: 0.9em; margin-bottom: 10px; line-height: 1.4; }
     .badge-status { padding: 6px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold; display: block; text-align: center; }
@@ -284,7 +276,6 @@
         let controleTurma = {}; 
 
         estadoGrade.forEach(aula => {
-            // Analisa cada professor individualmente
             if (aula.professores.length > 0) {
                 aula.professores.forEach(profNome => {
                     const chaveProf = `${profNome}|${aula.diaSemana}|${aula.horaInicio}`;
