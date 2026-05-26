@@ -10,10 +10,8 @@
     .grid-simulador th { background-color: #2c3e50; color: white; padding: 12px; border: 1px solid #bdc3c7; }
     .grid-simulador td { padding: 8px; border: 1px solid #bdc3c7; background: #ffffff; vertical-align: top; height: 100px; transition: background 0.2s; }
     
-    /* Zonas de Drop quando um card está por cima */
     .dropzone-hover { background: #e8f4f8 !important; border: 2px dashed #3498db !important; }
     
-    /* Estilização dos Cards Arrastáveis com Correção de Texto */
     .card-simulacao { 
         padding: 8px; 
         border-radius: 4px; 
@@ -24,7 +22,6 @@
         transition: opacity 0.2s, transform 0.1s; 
         height: 100%;
         box-sizing: border-box;
-        
         word-break: break-word;
         overflow: hidden;
         display: -webkit-box;
@@ -33,7 +30,6 @@
     }
     .card-simulacao:active { cursor: grabbing; opacity: 0.6; transform: scale(0.95); }
     
-    /* Efeito Visual para Cartões em Choque */
     .card-em-choque {
         border: 2px solid #e74c3c !important;
         box-shadow: 0 0 10px rgba(231, 76, 60, 0.4) !important;
@@ -45,9 +41,7 @@
         to { background-color: #fadbd8; }
     }
     
-    /* Alertas */
     .alerta-box { background: white; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #c0392b; font-size: 0.9em; margin-bottom: 10px; line-height: 1.4; }
-    
     .badge-status { padding: 6px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold; display: block; text-align: center; }
     .status-limpo { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .status-conflito { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -55,22 +49,43 @@
 
 <div class="simulador-container">
     <div class="painel-principal">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2 style="color: #2c3e50; margin: 0;">🛠️ Simulador de Cenários</h2>
-            <div>
-                <label for="filtraTurma" style="font-weight: bold; color: #2c3e50; margin-right: 10px;">Navegar pelas Turmas:</label>
-                <select id="filtraTurma" onchange="renderizarGradeSimulada()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 250px;">
-                    <option value="">-- Escolha uma Turma --</option>
-                    {% for t in turmas %}
-                        <option value="{{ t.id }}">{{ t.nome }}</option>
-                    {% endfor %}
-                </select>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+            <h2 style="color: #2c3e50; margin: 0; padding-bottom: 5px;">🛠️ Simulador Dinâmico</h2>
+            
+            <div style="display: flex; gap: 15px; align-items: flex-end;">
+                <div>
+                    <label style="font-weight: bold; color: #2c3e50; display: block; margin-bottom: 5px;">Modo de Visão:</label>
+                    <select id="modoVisao" onchange="alterarModoVisao()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa;">
+                        <option value="turma">🏫 Visão por Turma</option>
+                        <option value="professor">👨‍🏫 Visão por Professor</option>
+                    </select>
+                </div>
+                
+                <div id="containerFiltroTurma">
+                    <label for="filtraTurma" style="font-weight: bold; color: #2c3e50; display: block; margin-bottom: 5px;">Selecione a Turma:</label>
+                    <select id="filtraTurma" onchange="renderizarGradeSimulada()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 220px;">
+                        <option value="">-- Escolha uma Turma --</option>
+                        {% for t in turmas %}
+                            <option value="{{ t.id }}">{{ t.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div id="containerFiltroProfessor" style="display: none;">
+                    <label for="filtraProfessor" style="font-weight: bold; color: #2c3e50; display: block; margin-bottom: 5px;">Selecione o Professor:</label>
+                    <select id="filtraProfessor" onchange="renderizarGradeSimulada()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 220px;">
+                        <option value="">-- Escolha um Professor --</option>
+                        {% for p in professores %}
+                            <option value="{{ p.nome_completo }}">{{ p.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </div>
 
         <div id="avisoSelecao" style="text-align: center; padding: 60px; color: #7f8c8d; border: 2px dashed #ccc; border-radius: 6px; background: #fafafa;">
             <h3>Bem-vindo ao Simulador Contínuo</h3>
-            <p>Selecione uma turma acima para começar. As trocas que você fizer serão guardadas na memória enquanto navega entre as turmas para resolver choques encadeados.</p>
+            <p>Selecione um Modo de Visão (Turma ou Professor) e utilize o filtro acima para começar.<br>As trocas ficarão guardadas na memória enquanto navega.</p>
         </div>
 
         <table id="tabelaSimulador" class="grid-simulador" style="display: none;">
@@ -107,26 +122,22 @@
         <div id="statusSimulacao" class="badge-status status-limpo">Simulação Limpa: 0 Choques</div>
 
         <div id="painelErros" style="flex-grow: 1; overflow-y: auto; margin-top: 15px;">
-            <p style="color: #7f8c8d; font-size: 0.9em; text-align: center;">Mova as disciplinas. Se houver choques, eles ficarão registados aqui até serem resolvidos.</p>
+            <p style="color: #7f8c8d; font-size: 0.9em; text-align: center;">Mova as disciplinas. Se houver choques (de Turma ou Professor), eles ficarão registados aqui.</p>
         </div>
         
         <button onclick="exportarPDFParaSEI()" style="padding: 12px; background: #2c3e50; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;">📄 Exportar PDF (SEI)</button>
-
-        <button onclick="desistirERestaurarOriginal()" style="padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.2s;">
-            ❌ Desistir das Alterações
-        </button>
+        <button onclick="desistirERestaurarOriginal()" style="padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.2s;">❌ Desistir das Alterações</button>
 
         <form id="formExportarPDF" method="POST" action="{% url 'exportar_pdf_simulacao' %}" target="_blank" style="display: none;">
             {% csrf_token %}
             <input type="hidden" name="estado_grade_json" id="estado_grade_json">
         </form>
-        </div>
+    </div>
 </div>
 
 <script>
     const nomesDias = { 2: 'Segunda', 3: 'Terça', 4: 'Quarta', 5: 'Quinta', 6: 'Sexta' };
 
-    // Toda a grade da escola carregada de uma só vez para o JavaScript
     let estadoGrade = [
         {% for item in grade_completa %}
         {
@@ -136,17 +147,23 @@
             diaSemana: {{ item.horario.dia_semana }},
             horaInicio: "{{ item.horario.hora_inicio|time:'H:i' }}",
             disciplina: "{{ item.disciplina.nome|default:'---' }}",
-            professor: "{{ item.professor.nome_completo|default:'Sem Prof.' }}"
+            // Array com a lista de professores e a String visual "Jorge / Aline"
+            professores: [
+                {% for p in item.professores.all %}
+                "{{ p.nome_completo }}"{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            ],
+            professoresStr: "{{ item.nomes_professores }}"
         },
         {% endfor %}
     ];
+
     const estadoOriginal = JSON.parse(JSON.stringify(estadoGrade));
-    let choquesAtivos = []; // Guardará os conflitos encontrados
+    let choquesAtivos = []; 
     let cardArrastadoId = null;
 
-    // Gerador de cores dinâmicas para as matérias
-    function obterCorPorPar(professor, disciplina) {
-        const textoCombinado = professor + disciplina;
+    function obterCorPorPar(professorStr, disciplina) {
+        const textoCombinado = professorStr + disciplina;
         let hash = 0;
         for (let i = 0; i < textoCombinado.length; i++) {
             hash = textoCombinado.charCodeAt(i) + ((hash << 5) - hash);
@@ -155,12 +172,24 @@
         return `hsl(${hue}, 65%, 92%)`;
     }
 
+    function alterarModoVisao() {
+        const modo = document.getElementById('modoVisao').value;
+        document.getElementById('containerFiltroTurma').style.display = modo === 'turma' ? 'block' : 'none';
+        document.getElementById('containerFiltroProfessor').style.display = modo === 'professor' ? 'block' : 'none';
+        
+        document.getElementById('filtraTurma').value = '';
+        document.getElementById('filtraProfessor').value = '';
+        renderizarGradeSimulada();
+    }
+
     function renderizarGradeSimulada() {
+        const modo = document.getElementById('modoVisao').value;
         const turmaId = document.getElementById('filtraTurma').value;
+        const profNome = document.getElementById('filtraProfessor').value;
         const tabela = document.getElementById('tabelaSimulador');
         const aviso = document.getElementById('avisoSelecao');
         
-        if (!turmaId) {
+        if ((modo === 'turma' && !turmaId) || (modo === 'professor' && !profNome)) {
             tabela.style.display = 'none';
             aviso.style.display = 'block';
             return;
@@ -171,12 +200,13 @@
 
         document.querySelectorAll('.grid-simulador td[id^="cell-"]').forEach(td => td.innerHTML = '');
 
-        // Recalcula choques antes de desenhar
         analisarChoquesGlobais();
 
-        const aulasTurma = estadoGrade.filter(a => a.turmaId === turmaId);
+        let aulasVisiveis = modo === 'turma' 
+            ? estadoGrade.filter(a => a.turmaId === turmaId) 
+            : estadoGrade.filter(a => a.professores.includes(profNome));
         
-        aulasTurma.forEach(aula => {
+        aulasVisiveis.forEach(aula => {
             const cellId = `cell-${aula.diaSemana}-${aula.horaInicio}`;
             const celulaTarget = document.getElementById(cellId);
             
@@ -186,18 +216,19 @@
                 card.id = `card-${aula.id}`;
                 card.draggable = true;
                 
-                // Aplica cor normal
-                card.style.backgroundColor = obterCorPorPar(aula.professor, aula.disciplina);
+                card.style.backgroundColor = obterCorPorPar(aula.professoresStr, aula.disciplina);
                 card.style.border = `1px solid rgba(0,0,0,0.1)`;
                 
-                // Verifica se esta aula específica está no meio de um choque
                 const emChoque = choquesAtivos.some(c => c.aulasEnvolvidas.includes(aula.id));
+                
+                let tituloCard = aula.disciplina;
+                let subtituloCard = modo === 'turma' ? aula.professoresStr : aula.turmaNome;
                 
                 if (emChoque) {
                     card.classList.add('card-em-choque');
-                    card.innerHTML = `<strong style="color: #c0392b;">⚠️ ${aula.disciplina}</strong><br><span style="color:#c0392b; font-weight:bold;">${aula.professor}</span>`;
+                    card.innerHTML = `<strong style="color: #c0392b;">⚠️ ${tituloCard}</strong><br><span style="color:#c0392b; font-weight:bold;">${subtituloCard}</span>`;
                 } else {
-                    card.innerHTML = `<strong style="color: #2c3e50;">${aula.disciplina}</strong><br><span style="color:#555;">${aula.professor}</span>`;
+                    card.innerHTML = `<strong style="color: #2c3e50;">${tituloCard}</strong><br><span style="color:#555;">${subtituloCard}</span>`;
                 }
                 
                 card.addEventListener('dragstart', (e) => {
@@ -219,65 +250,82 @@
         e.preventDefault();
         e.currentTarget.classList.remove('dropzone-hover');
         
-        const turmaAtualId = document.getElementById('filtraTurma').value;
-        if (!cardArrastadoId || !turmaAtualId) return;
+        const modo = document.getElementById('modoVisao').value;
+        const filtroAtualId = modo === 'turma' ? document.getElementById('filtraTurma').value : document.getElementById('filtraProfessor').value;
+        
+        if (!cardArrastadoId || !filtroAtualId) return;
 
-        // 1. Encontra a aula que está a ser movida
         const aulaArrastada = estadoGrade.find(a => a.id === cardArrastadoId);
         
-        // 2. Verifica se o destino já tem uma aula (para fazer a Permuta)
-        const aulaNoDestino = estadoGrade.find(a => 
-            a.turmaId === turmaAtualId && 
+        let aulaNoDestino = estadoGrade.find(a => 
+            (modo === 'turma' ? a.turmaId === filtroAtualId : a.professores.includes(filtroAtualId)) && 
             a.diaSemana == diaDestino && 
             a.horaInicio === horaDestino
         );
 
-        // Guardamos as posições originais
         const diaAntigo = aulaArrastada.diaSemana;
         const horaAntiga = aulaArrastada.horaInicio;
 
-        // 3. Aplica a troca na memória (Sempre permite o movimento)
         aulaArrastada.diaSemana = diaDestino;
         aulaArrastada.horaInicio = horaDestino;
 
         if (aulaNoDestino) {
-            // Se havia alguém lá, empurra-o para o espaço que ficou vazio (Swap)
             aulaNoDestino.diaSemana = diaAntigo;
             aulaNoDestino.horaInicio = horaAntiga;
         }
 
         cardArrastadoId = null;
-        
-        // 4. Redesenha a tela. A função de renderizar chamará a análise de choques automaticamente
         renderizarGradeSimulada();
     }
 
     function analisarChoquesGlobais() {
         choquesAtivos = [];
-        let controleOcupacao = {}; // Mapeia "ProfName-Dia-Hora"
+        let controleProf = {}; 
+        let controleTurma = {}; 
 
         estadoGrade.forEach(aula => {
-            if (!aula.professor || aula.professor === 'Sem Prof.') return;
-            
-            const chave = `${aula.professor}|${aula.diaSemana}|${aula.horaInicio}`;
-            
-            if (!controleOcupacao[chave]) {
-                controleOcupacao[chave] = [];
+            // Analisa cada professor individualmente
+            if (aula.professores.length > 0) {
+                aula.professores.forEach(profNome => {
+                    const chaveProf = `${profNome}|${aula.diaSemana}|${aula.horaInicio}`;
+                    if (!controleProf[chaveProf]) controleProf[chaveProf] = [];
+                    controleProf[chaveProf].push({...aula, profCausador: profNome});
+                });
             }
-            controleOcupacao[chave].push(aula);
+            
+            if (aula.disciplina && aula.disciplina !== '---') {
+                const chaveTurma = `${aula.turmaId}|${aula.diaSemana}|${aula.horaInicio}`;
+                if (!controleTurma[chaveTurma]) controleTurma[chaveTurma] = [];
+                controleTurma[chaveTurma].push(aula);
+            }
         });
 
-        // Procura por horários onde o professor aparece em mais de 1 turma
-        for (let chave in controleOcupacao) {
-            const aulas = controleOcupacao[chave];
+        for (let chave in controleProf) {
+            const aulas = controleProf[chave];
             if (aulas.length > 1) {
                 const turmasAfetadas = aulas.map(a => a.turmaNome).join(' e ');
                 choquesAtivos.push({
-                    professor: aulas[0].professor,
+                    tipo: 'Professor Duplicado',
+                    alvo: aulas[0].profCausador, 
                     dia: nomesDias[aulas[0].diaSemana],
                     hora: aulas[0].horaInicio,
-                    turmasTexto: turmasAfetadas,
-                    aulasEnvolvidas: aulas.map(a => a.id) // Guarda os IDs para pintar de vermelho
+                    detalhe: `Turmas: ${turmasAfetadas}`,
+                    aulasEnvolvidas: aulas.map(a => a.id)
+                });
+            }
+        }
+        
+        for (let chave in controleTurma) {
+            const aulas = controleTurma[chave];
+            if (aulas.length > 1) {
+                const profsAfetados = aulas.map(a => `${a.disciplina} (${a.professoresStr})`).join(' vs ');
+                choquesAtivos.push({
+                    tipo: 'Choque de Turma',
+                    alvo: aulas[0].turmaNome,
+                    dia: nomesDias[aulas[0].diaSemana],
+                    hora: aulas[0].horaInicio,
+                    detalhe: `Conflito físico: ${profsAfetados}`,
+                    aulasEnvolvidas: aulas.map(a => a.id)
                 });
             }
         }
@@ -299,40 +347,41 @@
             choquesAtivos.forEach(c => {
                 const errDiv = document.createElement('div');
                 errDiv.className = 'alerta-box';
-                errDiv.innerHTML = `<strong>Prof. ${c.professor.split(' ')[0]}</strong> ocupado em duplicado<br>
+                errDiv.innerHTML = `<strong>${c.tipo}</strong><br>
+                                    <span style="color:#e74c3c; font-weight:bold;">🎯 ${c.alvo}</span><br>
                                     <span style="color:#7f8c8d; font-size:0.9em;">📅 ${c.dia} às ${c.hora}</span><br>
-                                    <span style="font-weight:bold; font-size:0.9em; margin-top:5px; display:block;">📍 Turmas: ${c.turmasTexto}</span>`;
+                                    <span style="font-weight:bold; font-size:0.85em; margin-top:5px; display:block;">📍 ${c.detalhe}</span>`;
                 painelErros.appendChild(errDiv);
             });
         }
     }
+
     function exportarPDFParaSEI() {
-        const turmaId = document.getElementById('filtraTurma').value;
-        if (!turmaId) {
-            alert('Por favor, selecione uma turma antes de exportar o documento PDF.');
+        const modo = document.getElementById('modoVisao').value;
+        const filtroAtualId = modo === 'turma' ? document.getElementById('filtraTurma').value : document.getElementById('filtraProfessor').value;
+        
+        if (!filtroAtualId) {
+            alert('Por favor, selecione uma Turma ou um Professor antes de exportar o PDF.');
             return;
         }
         
-        // Filtra o estado atual da memória do navegador correspondente apenas à turma ativa
-        const gradeFiltradaTurma = estadoGrade.filter(a => a.turmaId === turmaId);
+        let gradeFiltrada = [];
+        if (modo === 'turma') {
+            gradeFiltrada = estadoGrade.filter(a => a.turmaId === filtroAtualId);
+        } else {
+            gradeFiltrada = estadoGrade.filter(a => a.professores.includes(filtroAtualId));
+            gradeFiltrada = gradeFiltrada.map(a => ({...a, turmaNome: a.professoresStr})); 
+        }
         
-        // Injeta a string JSON no formulário oculto e submete abrindo em uma nova aba para download
-        document.getElementById('estado_grade_json').value = JSON.stringify(gradeFiltradaTurma);
+        document.getElementById('estado_grade_json').value = JSON.stringify(gradeFiltrada);
         document.getElementById('formExportarPDF').submit();
     }
-    // =========================================================================
-    // FUNÇÃO PARA DESISTIR E RESTAURAR O HORÁRIO ORIGINAL
-    // =========================================================================
+
     function desistirERestaurarOriginal() {
-        if (confirm("Tem a certeza de que deseja desistir das alterações? Todas as modificações feitas nesta sessão serão descartadas e a grade original será restaurada.")) {
-            
-            // Sobrescreve o estado atual com a cópia de segurança original
+        if (confirm("Tem a certeza de que deseja desistir das alterações? A grade original será restaurada.")) {
             estadoGrade = JSON.parse(JSON.stringify(estadoOriginal));
-            
-            // Força a atualização da tela
             renderizarGradeSimulada();
-            
-            alert("Grade restaurada para o horário original com sucesso!");
+            alert("Grade restaurada com sucesso!");
         }
     }
 </script>

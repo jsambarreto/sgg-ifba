@@ -14,7 +14,6 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.core.mail import send_mail 
 from django.conf import settings  
-from django.db.models import Q     
 
 @login_required
 def exibir_grade(request):
@@ -54,7 +53,7 @@ def exibir_grade(request):
     # ==========================================
     # ABA 1: MINHA GRADE (Com sobreposição)
     # ==========================================
-    aulas_do_prof = GradeHoraria.objects.filter(professor=professor_logado).select_related('turma', 'disciplina', 'horario')
+    aulas_do_prof = GradeHoraria.objects.filter(professores=professor_logado).select_related('turma', 'disciplina', 'horario')
     
     for aula in aulas_do_prof:
         chave = f"{aula.horario.dia_semana}-{aula.horario.hora_inicio.strftime('%H:%M')}"
@@ -80,7 +79,7 @@ def exibir_grade(request):
                 grade_pessoal_map[chave]['info_extra'] = f"Subst. por {nome_sub}"
                 grade_pessoal_map[chave]['cor'] = '#ffeeba' 
             elif sol.tipo == 'P' and sol.aula_destino:
-                nome_perm = sol.aula_destino.professor.nome_completo.split()[0]
+                nome_perm = sol.aula_destino.nomes_professores
                 grade_pessoal_map[chave]['info_extra'] = f"Permuta c/ {nome_perm}"
                 grade_pessoal_map[chave]['cor'] = '#d1ecf1' 
 
@@ -95,7 +94,7 @@ def exibir_grade(request):
             'cor': '#d4edda' 
         }
         
-    entradas_perm = Solicitacao.objects.filter(aula_destino__professor=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='P')
+    entradas_perm = Solicitacao.objects.filter(aula_destino__professores=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='P')
     for sol in entradas_perm:
         chave = f"{sol.aula_destino.horario.dia_semana}-{sol.aula_destino.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
@@ -109,20 +108,20 @@ def exibir_grade(request):
     # ==========================================
     # ABA 2: GRADE DA TURMA (Com sobreposição)
     # ==========================================
-    turmas_do_prof = Turma.objects.filter(grade__professor=professor_logado).distinct().order_by('nome')
+    turmas_do_prof = Turma.objects.filter(grade__professores=professor_logado).distinct().order_by('nome')
     
     if aba_ativa == 'turma' and turma_selecionada_id:
         turma_selecionada = Turma.objects.filter(id=turma_selecionada_id).first()
         if turma_selecionada:
-            aulas_da_turma = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('professor', 'disciplina', 'horario')
+            aulas_da_turma = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('disciplina', 'horario').prefetch_related('professores')
             
             for aula in aulas_da_turma:
                 chave = f"{aula.horario.dia_semana}-{aula.horario.hora_inicio.strftime('%H:%M')}"
                 grade_turma_map[chave] = {
                     'id': aula.id,
-                    'professor': aula.professor.nome_completo if aula.professor else "Sem Prof.",
+                    'professor': aula.nomes_professores,
                     'disciplina': aula.disciplina.nome if aula.disciplina else "---",
-                    'is_minha_aula': aula.professor == professor_logado,
+                    'is_minha_aula': professor_logado in aula.professores.all(),
                     'info_extra': '',
                     'cor': ''
                 }
@@ -135,7 +134,7 @@ def exibir_grade(request):
                         grade_turma_map[chave]['info_extra'] = f"Faltará dia {sol.data_aplicacao.strftime('%d/%m')}"
                         grade_turma_map[chave]['cor'] = '#ffcccc'
                     elif sol.tipo == 'S' or sol.tipo == 'P':
-                        prof_novo = sol.professor_substituto if sol.tipo == 'S' else sol.aula_destino.professor
+                        prof_novo = sol.professor_substituto if sol.tipo == 'S' else (sol.aula_destino.professores.first() if sol.aula_destino else None)
                         nome_novo = prof_novo.nome_completo.split()[0] if prof_novo else 'Alguém'
                         grade_turma_map[chave]['professor'] = f"{nome_novo} (Subst.)"
                         grade_turma_map[chave]['info_extra'] = f"Cobrindo {sol.solicitante.nome_completo.split()[0]}"
@@ -160,15 +159,11 @@ def exibir_grade(request):
     }
     
     return render(request, 'gestao/grade.html', contexto)
-    
+
 def api_solicitar_permuta(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            origem_id = dados.get('aula_origem_id')
-            destino_id = dados.get('aula_destino_id')
-            data_aplicacao = dados.get('data_aplicacao')
-
             data_app = dados.get('data_aplicacao', datetime.now().strftime('%Y-%m-%d'))
             carater = dados.get('carater', 'T')
 
@@ -217,19 +212,21 @@ def api_processar_aprovacao(request):
                         aula_origem = solicitacao.aula_origem
                         if solicitacao.tipo == 'P': 
                             aula_destino = solicitacao.aula_destino
-                            prof_orig, disc_orig = aula_origem.professor, aula_origem.disciplina
-                            aula_origem.professor = aula_destino.professor
+                            professores_orig = list(aula_origem.professores.all())
+                            professores_dest = list(aula_destino.professores.all())
+                            disc_orig = aula_origem.disciplina
+                            
+                            aula_origem.professores.set(professores_dest)
                             aula_origem.disciplina = aula_destino.disciplina
-                            aula_destino.professor = prof_orig
+                            
+                            aula_destino.professores.set(professores_orig)
                             aula_destino.disciplina = disc_orig
                             aula_destino.save()
                         else: 
-                            aula_origem.professor = solicitacao.professor_substituto
+                            aula_origem.professores.set([solicitacao.professor_substituto])
                             aula_origem.disciplina = solicitacao.disciplina_substituta
                         
                         aula_origem.save()
-                    else:
-                        mensagem = f"Alteração aprovada com sucesso!"
 
                     solicitacao.status = 'A'
                     solicitacao.save()
@@ -307,11 +304,11 @@ def construtor_grade(request):
             for h in h_permitidos:
                 horarios_ids[f"{h.dia_semana}-{h.hora_inicio.strftime('%H:%M')}"] = h.id
 
-            grade = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('professor', 'disciplina', 'horario')
+            grade = GradeHoraria.objects.filter(turma=turma_selecionada).select_related('disciplina', 'horario').prefetch_related('professores')
             for item in grade:
                 chave = f"{item.horario.dia_semana}-{item.horario.hora_inicio.strftime('%H:%M')}"
                 grade_map[chave] = {
-                    'prof': item.professor.nome_completo if item.professor else "---",
+                    'professores': [{'id': p.id, 'nome': p.nome_completo} for p in item.professores.all()],
                     'disc': item.disciplina.nome if item.disciplina else "---"
                 }
 
@@ -333,14 +330,17 @@ def api_salvar_aula_base(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            GradeHoraria.objects.update_or_create(
+            aula, created = GradeHoraria.objects.update_or_create(
                 turma_id=dados.get('turma_id'),
                 horario_id=dados.get('horario_id'),
-                defaults={
-                    'professor_id': dados.get('professor_id'),
-                    'disciplina_id': dados.get('disciplina_id')
-                }
+                defaults={'disciplina_id': dados.get('disciplina_id')}
             )
+            prof_ids = dados.get('professores_ids', [])
+            if prof_ids:
+                aula.professores.set(prof_ids)
+            else:
+                aula.professores.clear()
+                
             return JsonResponse({"sucesso": True})
         except Exception as e:
             return JsonResponse({"sucesso": False, "erro": str(e)}, status=500)
@@ -352,7 +352,7 @@ def relatorio_carga_horaria(request):
         raise PermissionDenied("Acesso restrito à Direção do Campus.")
 
     professores = Professor.objects.annotate(
-        total_aulas=Count('gradehoraria')
+        total_aulas=Count('grades_horarias')
     ).order_by('-total_aulas') 
 
     return render(request, 'gestao/relatorio_carga.html', {'professores': professores})
@@ -377,7 +377,7 @@ def pagina_inicial(request):
             professor_substituto=prof, status='A', devolucao_pendente=True
         )
         creditos_perm = Solicitacao.objects.filter(
-            aula_destino__professor=prof, status='A', devolucao_pendente=True
+            aula_destino__professores=prof, status='A', devolucao_pendente=True
         )
         creditos = list(creditos_sub) + list(creditos_perm)
         
@@ -428,7 +428,8 @@ def gerar_pdf_sei(request, id):
         cursos_envolvidos.add(sol.aula_origem.turma.nome)
         if sol.tipo == 'P' and sol.aula_destino:
             tem_permuta = True
-            substitutos_unicos.add(sol.aula_destino.professor)
+            for p in sol.aula_destino.professores.all():
+                substitutos_unicos.add(p)
         elif sol.professor_substituto:
             substitutos_unicos.add(sol.professor_substituto)
 
@@ -474,12 +475,11 @@ def nova_solicitacao(request, aula_id, tipo):
         
         # --- LÓGICA DE DEVOLUÇÃO (SISTEMA DE CRÉDITO) ---
         data_devolucao_post = request.POST.get('data_devolucao')
-        a_combinar = request.POST.get('a_combinar') == 'on' # Checkbox no formulário
+        a_combinar = request.POST.get('a_combinar') == 'on' 
         
         devolucao_pendente = False
         data_devolucao = None
         
-        # Se for Falta (L), não há devolução
         if tipo != 'L':
             if a_combinar or not data_devolucao_post:
                 devolucao_pendente = True
@@ -511,7 +511,7 @@ def nova_solicitacao(request, aula_id, tipo):
             assunto = f"⏳ Novo Pedido de {nome_tipo} - {professor_logado.nome_completo}"
             mensagem = f"""Olá, Coordenação. Foi feito um pedido de {nome_tipo}. Acesse o sistema."""
             destinatarios = ['informatica.euc@ifba.edu.br']
-            send_mail(assunto, mensagem, settings.DEFAULT_FROM_EMAIL, destinatarios, fail_silently=True)
+            send_mail(assunto, message, settings.DEFAULT_FROM_EMAIL, destinatarios, fail_silently=True)
         except Exception as e:
             print(f"Erro e-mail: {e}")
             
@@ -527,8 +527,8 @@ def nova_solicitacao(request, aula_id, tipo):
         contexto['opcoes_destino'] = GradeHoraria.objects.filter(
             turma=aula_origem.turma
         ).exclude(
-            professor=professor_logado
-        ).select_related('professor', 'disciplina', 'turma', 'horario')
+            professores=professor_logado
+        ).select_related('disciplina', 'turma', 'horario').prefetch_related('professores')
         
     elif tipo == 'S':
         contexto['professores'] = Professor.objects.exclude(id=professor_logado.id).order_by('nome_completo')
@@ -544,11 +544,9 @@ def api_informar_pagamento(request):
 
             solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
 
-            # Segurança: Garante que apenas o devedor pode informar o pagamento
             if solicitacao.solicitante != getattr(request.user, 'professor', None):
                 return JsonResponse({'sucesso': False, 'erro': 'Sem permissão para alterar esta dívida.'})
 
-            # Atualiza os campos de crédito que criamos
             solicitacao.data_devolucao = data_pagamento
             solicitacao.devolucao_pendente = False
             solicitacao.save()
@@ -558,13 +556,11 @@ def api_informar_pagamento(request):
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
-
 @login_required
 def simulador_grade(request):
     """
     Renderiza a interface de arrastar e soltar para os coordenadores e diretores.
     """
-    # TRAVA DE SEGURANÇA: Permite acesso a Coordenador, Diretor ou Superuser
     prof = getattr(request.user, 'professor', None)
     if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
         raise PermissionDenied("Acesso restrito à Coordenação e Direção do Campus.")
@@ -573,7 +569,7 @@ def simulador_grade(request):
     professores = Professor.objects.all().order_by('nome_completo')
     horarios = Horario.objects.all().order_by('dia_semana', 'hora_inicio')
     
-    grade_completa = GradeHoraria.objects.select_related('turma', 'horario', 'disciplina', 'professor').all()
+    grade_completa = GradeHoraria.objects.select_related('turma', 'horario', 'disciplina').prefetch_related('professores').all()
     
     horarios_unicos = Horario.objects.all().order_by('hora_inicio').values_list('hora_inicio', flat=True).distinct()
     slots_horarios = [h.strftime('%H:%M') for h in horarios_unicos]
@@ -586,107 +582,9 @@ def simulador_grade(request):
         'grade_completa': grade_completa,
     }
     return render(request, 'gestao/simulador_grade.html', contexto)
-@login_required
-def api_verificar_movimento(request):
-    # TRAVA DE SEGURANÇA PARA A API
-    prof = getattr(request.user, 'professor', None)
-    if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
-        return JsonResponse({'sucesso': False, 'erro': 'Acesso negado. Apenas coordenadores e diretores podem simular.'}, status=403)
 
-    if request.method == 'POST':
-        try:
-            dados = json.loads(request.body)
-            grade_id = dados.get('grade_id') 
-            novo_horario_id = dados.get('novo_horario_id') 
-            nova_turma_id = dados.get('nova_turma_id') 
-
-            aula_movida = get_object_or_404(GradeHoraria, id=grade_id)
-            novo_horario = get_object_or_404(Horario, id=novo_horario_id)
-            nova_turma = get_object_or_404(Turma, id=nova_turma_id)
-            
-            horario_antigo = aula_movida.horario
-            prof_x = aula_movida.professor
-
-            resultado = {
-                'permitido': True,
-                'is_permuta': False,
-                'choques': [],
-                'sugestoes': [],
-                'mensagem_sucesso': ''
-            }
-
-            aula_destino = GradeHoraria.objects.filter(turma=nova_turma, horario=novo_horario).first()
-
-            if aula_destino:
-                resultado['is_permuta'] = True
-                prof_y = aula_destino.professor
-
-                if prof_x:
-                    choque_x = GradeHoraria.objects.filter(
-                        professor=prof_x, horario=novo_horario
-                    ).exclude(id=aula_movida.id).first()
-                    
-                    if choque_x:
-                        resultado['permitido'] = False
-                        resultado['choques'].append({
-                            'tipo': f'Choque: Prof. {prof_x.nome_completo.split()[0]}',
-                            'mensagem': f"Já leciona '{choque_x.disciplina.nome}' na turma {choque_x.turma.nome}."
-                        })
-
-                if prof_y:
-                    choque_y = GradeHoraria.objects.filter(
-                        professor=prof_y, horario=horario_antigo
-                    ).exclude(id=aula_destino.id).first()
-                    
-                    if choque_y:
-                        resultado['permitido'] = False
-                        resultado['choques'].append({
-                            'tipo': f'Choque: Prof. {prof_y.nome_completo.split()[0]}',
-                            'mensagem': f"Já leciona '{choque_y.disciplina.nome}' na turma {choque_y.turma.nome} no horário original de troca."
-                        })
-
-                if resultado['permitido']:
-                    nome_x = prof_x.nome_completo.split()[0] if prof_x else 'Sem Prof'
-                    nome_y = prof_y.nome_completo.split()[0] if prof_y else 'Sem Prof'
-                    resultado['mensagem_sucesso'] = f"Permuta simulada com sucesso entre {nome_x} e {nome_y}!"
-
-            else:
-                if prof_x:
-                    choque_x = GradeHoraria.objects.filter(
-                        professor=prof_x, horario=novo_horario
-                    ).exclude(id=aula_movida.id).first()
-
-                    if choque_x:
-                        resultado['permitido'] = False
-                        resultado['choques'].append({
-                            'tipo': f'Choque: Prof. {prof_x.nome_completo.split()[0]}',
-                            'mensagem': f"Já está na turma {choque_x.turma.nome} neste horário."
-                        })
-
-                if resultado['permitido']:
-                    resultado['mensagem_sucesso'] = "Aula movida para horário livre com sucesso!"
-                else:
-                    horarios_possiveis = nova_turma.horarios_permitidos.all()
-                    for hp in horarios_possiveis:
-                        turma_livre = not GradeHoraria.objects.filter(turma=nova_turma, horario=hp).exists()
-                        prof_livre = not GradeHoraria.objects.filter(professor=prof_x, horario=hp).exists() if prof_x else True
-                        if turma_livre and prof_livre:
-                            resultado['sugestoes'].append({
-                                'horario_id': hp.id,
-                                'texto': f"{hp.get_dia_semana_display()} às {hp.hora_inicio.strftime('%H:%M')}"
-                            })
-                            if len(resultado['sugestoes']) >= 3:
-                                break
-
-            return JsonResponse(resultado)
-
-        except Exception as e:
-            return JsonResponse({'sucesso': False, 'erro': str(e)})
-
-    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 @login_required
 def exportar_pdf_simulacao(request):
-    # TRAVA DE SEGURANÇA PARA O PDF
     prof = getattr(request.user, 'professor', None)
     if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
         return HttpResponse("Acesso restrito à Coordenação e Direção do Campus.", status=403)
@@ -711,14 +609,14 @@ def exportar_pdf_simulacao(request):
             for item in estado_simulado:
                 turma_nome = item['turmaNome']
                 
-                aula_original = GradeHoraria.objects.select_related('horario', 'professor', 'disciplina').get(id=item['id'])
+                aula_original = GradeHoraria.objects.select_related('horario', 'disciplina').get(id=item['id'])
                 
                 dia_antigo = aula_original.horario.dia_semana
                 hora_antiga = aula_original.horario.hora_inicio.strftime('%H:%M')
                 
                 if int(item['diaSemana']) != dia_antigo or item['horaInicio'] != hora_antiga:
                     alteracoes.append({
-                        'professor': item['professor'],
+                        'professor': item['professoresStr'],
                         'disciplina': item['disciplina'],
                         'de_dia': nomes_dias.get(dia_antigo),
                         'de_hora': hora_antiga,
@@ -727,9 +625,8 @@ def exportar_pdf_simulacao(request):
                     })
                 
                 chave = f"{item['diaSemana']}-{item['horaInicio']}"
-                grade_map[chave] = f"<strong>{item['disciplina']}</strong><br><span style='color:#555;'>{item['professor']}</span>"
+                grade_map[chave] = f"<strong>{item['disciplina']}</strong><br><span style='color:#555;'>{item['professoresStr']}</span>"
             
-            # Ajuste de segurança: Passa o 'coordenador' correto para o template ou avisa que é Super User
             contexto = {
                 'coordenador': prof if prof else request.user,
                 'data_geracao': datetime.now(),

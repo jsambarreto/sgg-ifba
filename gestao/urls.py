@@ -20,7 +20,6 @@ urlpatterns = [
     path('solicitar/<int:aula_id>/<str:tipo>/', views.nova_solicitacao, name='nova_solicitacao'),
     path('api/pagar/', views.api_informar_pagamento, name='api_informar_pagamento'),
     path('simulador/', views.simulador_grade, name='simulador_grade'),
-    path('api/simular-movimento/', views.api_verificar_movimento, name='api_verificar_movimento'),
     path('simulador/exportar-pdf/', views.exportar_pdf_simulacao, name='exportar_pdf_simulacao'),
 ]
 

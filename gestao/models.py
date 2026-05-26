@@ -52,10 +52,20 @@ class GradeHoraria(models.Model):
     turma = models.ForeignKey(Turma, on_delete=models.CASCADE, related_name='grade')
     horario = models.ForeignKey(Horario, on_delete=models.CASCADE)
     disciplina = models.ForeignKey(Disciplina, on_delete=models.CASCADE, null=True, blank=True)
-    professor = models.ForeignKey(Professor, on_delete=models.CASCADE, null=True, blank=True)
+    
+    # NOVO CAMPO: Muitos-para-Muitos
+    professores = models.ManyToManyField(Professor, blank=True, related_name='grades_horarias')
 
     class Meta:
         unique_together = ('turma', 'horario')
+
+    # Propriedade que resolve a formatação visual "Jorge / Aline"
+    @property
+    def nomes_professores(self):
+        profs = self.professores.all()
+        if profs.exists():
+            return " / ".join([p.nome_completo.split()[0] for p in profs])
+        return "Sem Prof."
 
 class Solicitacao(models.Model):
     TIPO_CHOICES = [('P', 'Permuta'), 

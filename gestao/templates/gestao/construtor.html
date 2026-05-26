@@ -66,7 +66,13 @@
                                     {% if chave in grade_map %}
                                         <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; font-size: 0.85em;">
                                             <strong style="display: block; color: #155724;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
-                                            <span style="color: #155724;">{{ grade_map|get_item:chave|get_item:'prof' }}</span>
+                                            <span style="color: #155724;">
+                                                {% for p in grade_map|get_item:chave|get_item:'professores' %}
+                                                    {{ p.nome }}{% if not forloop.last %} / {% endif %}
+                                                {% empty %}
+                                                    Sem Prof.
+                                                {% endfor %}
+                                            </span>
                                             <br>
                                             <button onclick="abrirModal('{{ dia }}', '{{ hora }}')" style="margin-top: 5px; font-size: 0.8em; cursor: pointer; border: none; background: none; color: #007bff; text-decoration: underline;">Editar</button>
                                         </div>
@@ -93,10 +99,10 @@
             <input type="hidden" id="modalHora">
 
             <label style="display: block; margin-top: 15px; font-weight: bold;">Disciplina:</label>
-            <select id="modalDisciplina" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="">-- Selecione --</option>
-                {% for disc in disciplinas %}
-                    <option value="{{ disc.id }}">{{ disc.nome }}</option>
+            <label style="display: block; margin-top: 15px; font-weight: bold;">Professores (Segure CTRL para vários):</label>
+            <select id="modalProfessor" multiple style="width: 100%; height: 90px; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                {% for prof in professores %}
+                    <option value="{{ prof.id }}">{{ prof.nome_completo }}</option>
                 {% endfor %}
             </select>
 
@@ -144,15 +150,19 @@
     }
 
     async function salvarAula() {
+        const profSelect = document.getElementById('modalProfessor');
+        // Transforma todas as opções clicadas num Array de IDs
+        const profIds = Array.from(profSelect.selectedOptions).map(opt => opt.value);
+
         const payload = {
             turma_id: '{{ turma_selecionada.id }}',
             horario_id: document.getElementById('modalHora').value,
             disciplina_id: document.getElementById('modalDisciplina').value,
-            professor_id: document.getElementById('modalProfessor').value
+            professores_ids: profIds // Envia a lista para o Django
         };
 
-        if (!payload.disciplina_id || !payload.professor_id) {
-            alert("Selecione ambos!"); return;
+        if (!payload.disciplina_id) {
+            alert("Por favor, selecione a disciplina!"); return;
         }
 
         const response = await fetch('/api/construtor/salvar/', {

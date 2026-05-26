@@ -11,7 +11,7 @@ def verificar_choque_horario(professor, horario_alvo):
     em qualquer outra turma da instituição.
     """
     choque = GradeHoraria.objects.filter(
-        professor=professor, 
+        professores=professor, 
         horario=horario_alvo
     ).select_related('turma', 'disciplina').first()
     
@@ -23,20 +23,15 @@ def processar_permuta(solicitante, id_aula_origem, id_aula_destino, data_aplicac
     aula_destino = GradeHoraria.objects.get(id=id_aula_destino)
     
     # 1. Validar choque para o Solicitante assumindo o horário de destino
-    choque_solicitante = verificar_choque_horario(aula_origem.professor, aula_destino.horario)
+    choque_solicitante = verificar_choque_horario(solicitante, aula_destino.horario)
     if choque_solicitante:
-        return {
-            "sucesso": False, 
-            "erro": f"Troca impossível: Professor {aula_origem.professor.nome_completo} já possui aula na turma {choque_solicitante.turma.nome} neste horário."
-        }
+        return {"sucesso": False, "erro": f"Troca impossível: Você já possui aula na turma {choque_solicitante.turma.nome} neste horário."}
 
-    # 2. Validar choque para o Professor da aula de destino assumindo o horário de origem
-    choque_destino = verificar_choque_horario(aula_destino.professor, aula_origem.horario)
-    if choque_destino:
-        return {
-            "sucesso": False, 
-            "erro": f"Troca impossível: Professor {aula_destino.professor.nome_completo} já possui aula na turma {choque_destino.turma.nome} neste horário."
-        }
+    # 2. Validar choque para TODOS os Professores da aula de destino assumindo o horário de origem
+    for prof_destino in aula_destino.professores.all():
+        choque_destino = verificar_choque_horario(prof_destino, aula_origem.horario)
+        if choque_destino:
+            return {"sucesso": False, "erro": f"Troca impossível: Professor {prof_destino.nome_completo} já possui aula na turma {choque_destino.turma.nome} neste horário."}
 
     # 3. Criar a solicitação pendente
     nova_solicitacao = Solicitacao.objects.create(
@@ -101,7 +96,7 @@ def processar_acao_modal(solicitante, id_aula, acao, id_prof_sub=None, id_disc_s
     # 3. LÓGICA DE AÇÃO
     if acao == 'liberar':
         with transaction.atomic():
-            aula.professor = None
+            aula.professores.clear()
             aula.disciplina = None
             aula.save()
 
@@ -167,7 +162,6 @@ def gerar_grade_vazia_para_turma(turma_id):
                 GradeHoraria.objects.create(
                     turma=turma,
                     horario=horario,
-                    professor=None,
                     disciplina=None
                 )
                 slots_criados += 1
