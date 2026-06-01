@@ -55,9 +55,9 @@
                         <td style="padding: 8px; border: 1px solid #bdc3c7; background: #fff; width: 18%; vertical-align: top;">
                             {% with chave=dia|stringformat:"s"|add:"-"|add:hora %}
                                 {% if chave in grade_map %}
-                                    <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; font-size: 0.85em;">
-                                        <strong style="display: block; color: #155724;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
-                                        <span style="color: #155724;">{{ grade_map|get_item:chave|get_item:'professores_str'|default:"Sem Prof." }}</span>
+                                    <div class="card-aula" data-prof="{{ grade_map|get_item:chave|get_item:'professores_str'|default:'' }}" data-disc="{{ grade_map|get_item:chave|get_item:'disc'|default:'' }}" style="border: 1px solid rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; font-size: 0.85em; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                        <strong style="display: block; color: #2c3e50;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
+                                        <span style="color: #555;">{{ grade_map|get_item:chave|get_item:'professores_str'|default:"Sem Prof." }}</span>
                                         <br>
                                         <button onclick="abrirModal('{{ dia }}', '{{ hora }}', '{{ grade_map|get_item:chave|get_item:'disciplina_id' }}', {{ grade_map|get_item:chave|get_item:'professores_ids'|default:'[]' }})" style="margin-top: 5px; font-size: 0.85em; cursor: pointer; border: none; background: none; color: #007bff; text-decoration: underline; font-weight: bold;">Editar</button>
                                     </div>
@@ -110,7 +110,27 @@
     let horariosIds = {};
     try { horariosIds = JSON.parse(horariosData); } catch (e) {}
 
-    // Agora o Javascript recebe os IDs para preencher o Modal quando é clicado em "Editar"
+    // Algoritmo idêntico ao do simulador para gerar a cor HSL baseada no texto
+    function obterCorPorPar(professorStr, disciplina) {
+        if (!disciplina || disciplina === '---') return '#ffffff';
+        const textoCombinado = professorStr + disciplina;
+        let hash = 0;
+        for (let i = 0; i < textoCombinado.length; i++) {
+            hash = textoCombinado.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 65%, 92%)`;
+    }
+
+    // Executa a varredura e aplica as cores assim que o DOM carregar
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.card-aula').forEach(card => {
+            const prof = card.dataset.prof;
+            const disc = card.dataset.disc;
+            card.style.backgroundColor = obterCorPorPar(prof, disc);
+        });
+    });
+
     function abrirModal(dia, hora, disciplinaId, professoresIds) {
         const chave = `${dia}-${hora}`;
         const horarioId = horariosIds[chave];
@@ -123,10 +143,8 @@
         document.getElementById('modalDia').value = dia;
         document.getElementById('modalHora').value = horarioId;
         
-        // Seta a disciplina
         document.getElementById('modalDisciplina').value = disciplinaId || '';
         
-        // Seta os professores selecionados
         const profSelect = document.getElementById('modalProfessor');
         Array.from(profSelect.options).forEach(opt => {
             opt.selected = professoresIds && professoresIds.includes(parseInt(opt.value));
@@ -137,7 +155,6 @@
 
     async function salvarAula() {
         const profSelect = document.getElementById('modalProfessor');
-        // Pega todos os Options que o utilizador selecionou e transforma em Array
         const profIds = Array.from(profSelect.selectedOptions).map(opt => opt.value);
 
         const payload = {
