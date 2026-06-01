@@ -285,7 +285,6 @@ def api_gerar_grade_vazia(request):
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
 @login_required
-@apenas_gestores
 @apenas_coordenadores 
 def construtor_grade(request):
     turmas = Turma.objects.all().order_by('nome')

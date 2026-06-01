@@ -9,6 +9,11 @@
     .seletor-turma select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
     .btn-carregar { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     .area-trabalho { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; color: #7f8c8d; min-height: 300px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    
+    /* Estilos para o Arrastar e Soltar */
+    .card-aula { cursor: grab; transition: transform 0.1s, opacity 0.2s; }
+    .card-aula:active { cursor: grabbing; opacity: 0.6; transform: scale(0.98); }
+    .dropzone-hover { background: #e8f4f8 !important; border: 2px dashed #3498db !important; }
 </style>
 
 <div class="header">
@@ -36,15 +41,15 @@
     {% else %}
         <h3 style="margin-bottom: 20px; color: #2ecc71;">Montando Grade Base: {{ turma_selecionada.nome }}</h3>
         
-        <table style="width: 100%; border-collapse: collapse; text-align: center;">
+        <table style="width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed;">
             <thead style="background-color: #2c3e50; color: white;">
                 <tr>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Horário</th>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Segunda</th>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Terça</th>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Quarta</th>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Quinta</th>
-                    <th style="padding: 10px; border: 1px solid #bdc3c7;">Sexta</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 10%;">Horário</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 18%;">Segunda</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 18%;">Terça</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 18%;">Quarta</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 18%;">Quinta</th>
+                    <th style="padding: 10px; border: 1px solid #bdc3c7; width: 18%;">Sexta</th>
                 </tr>
             </thead>
             <tbody>
@@ -52,17 +57,29 @@
                 <tr>
                     <td style="padding: 15px; border: 1px solid #bdc3c7; font-weight: bold; background: #ecf0f1; color: #2c3e50;">{{ hora }}</td>
                     {% for dia in dias_semana %}
-                        <td style="padding: 8px; border: 1px solid #bdc3c7; background: #fff; width: 18%; vertical-align: top;">
+                        <td ondragover="allowDrop(event)" 
+                            ondragleave="dragLeave(event)" 
+                            ondrop="drop(event, '{{ dia }}', '{{ hora }}')"
+                            style="padding: 8px; border: 1px solid #bdc3c7; background: #fff; vertical-align: top; height: 100px; transition: background 0.2s;">
+                            
                             {% with chave=dia|stringformat:"s"|add:"-"|add:hora %}
                                 {% if chave in grade_map %}
-                                    <div class="card-aula" data-prof="{{ grade_map|get_item:chave|get_item:'professores_str'|default:'' }}" data-disc="{{ grade_map|get_item:chave|get_item:'disc'|default:'' }}" style="border: 1px solid rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; font-size: 0.85em; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                        <strong style="display: block; color: #2c3e50;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
-                                        <span style="color: #555;">{{ grade_map|get_item:chave|get_item:'professores_str'|default:"Sem Prof." }}</span>
-                                        <br>
+                                    <div class="card-aula" 
+                                         draggable="true"
+                                         ondragstart="dragStart(event, '{{ dia }}', '{{ hora }}', '{{ grade_map|get_item:chave|get_item:'disciplina_id' }}', '{% for p in grade_map|get_item:chave|get_item:'professores_ids' %}{{ p }}{% if not forloop.last %},{% endif %}{% endfor %}')"
+                                         data-prof="{{ grade_map|get_item:chave|get_item:'professores_str'|default:'' }}" 
+                                         data-disc="{{ grade_map|get_item:chave|get_item:'disc'|default:'' }}" 
+                                         data-disciplina-id="{{ grade_map|get_item:chave|get_item:'disciplina_id' }}"
+                                         data-professores-ids="{% for p in grade_map|get_item:chave|get_item:'professores_ids' %}{{ p }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                         style="border: 1px solid rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; font-size: 0.85em; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; box-sizing: border-box;">
+                                        
+                                        <strong style="display: block; color: #2c3e50; word-break: break-word;">{{ grade_map|get_item:chave|get_item:'disc' }}</strong>
+                                        <span style="color: #555; display: block; margin-top: 2px;">{{ grade_map|get_item:chave|get_item:'professores_str'|default:"Sem Prof." }}</span>
+                                        
                                         <button onclick="abrirModal('{{ dia }}', '{{ hora }}', '{{ grade_map|get_item:chave|get_item:'disciplina_id' }}', {{ grade_map|get_item:chave|get_item:'professores_ids'|default:'[]' }})" style="margin-top: 5px; font-size: 0.85em; cursor: pointer; border: none; background: none; color: #007bff; text-decoration: underline; font-weight: bold;">Editar</button>
                                     </div>
                                 {% else %}
-                                    <button onclick="abrirModal('{{ dia }}', '{{ hora }}', '', [])" style="width: 100%; padding: 10px 5px; border: 1px dashed #bdc3c7; background: #fafafa; cursor: pointer; color: #aaa; border-radius: 4px; font-weight: bold;">
+                                    <button onclick="abrirModal('{{ dia }}', '{{ hora }}', '', [])" style="width: 100%; height: 100%; padding: 10px 5px; border: 1px dashed #bdc3c7; background: #fafafa; cursor: pointer; color: #aaa; border-radius: 4px; font-weight: bold; min-height: 70px;">
                                         ➕ Adicionar
                                     </button>
                                 {% endif %}
@@ -110,7 +127,7 @@
     let horariosIds = {};
     try { horariosIds = JSON.parse(horariosData); } catch (e) {}
 
-    // Algoritmo idêntico ao do simulador para gerar a cor HSL baseada no texto
+    // Algoritmo dinâmico de coloração idêntico ao do simulador
     function obterCorPorPar(professorStr, disciplina) {
         if (!disciplina || disciplina === '---') return '#ffffff';
         const textoCombinado = professorStr + disciplina;
@@ -122,7 +139,6 @@
         return `hsl(${hue}, 65%, 92%)`;
     }
 
-    // Executa a varredura e aplica as cores assim que o DOM carregar
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.card-aula').forEach(card => {
             const prof = card.dataset.prof;
@@ -131,6 +147,98 @@
         });
     });
 
+    // =========================================================================
+    // INTELIGÊNCIA DE ARRASTAR E SOLTAR (DRAG AND DROP) PERSISTENTE
+    // =========================================================================
+    function dragStart(e, dia, hora, disciplinaId, professoresIdsStr) {
+        // Compacta todas as informações da célula de origem num objeto de transporte JSON
+        const payloadOrigem = {
+            dia: dia,
+            hora: hora,
+            disciplina_id: disciplinaId || null,
+            professores_ids: professoresIdsStr ? professoresIdsStr.split(',').map(Number) : []
+        };
+        e.dataTransfer.setData('text/plain', JSON.stringify(payloadOrigem));
+    }
+
+    function allowDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('dropzone-hover');
+    }
+
+    function dragLeave(e) {
+        e.currentTarget.classList.remove('dropzone-hover');
+    }
+
+    async function drop(e, diaDestino, horaDestino) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('dropzone-hover');
+
+        const dataStr = e.dataTransfer.getData('text/plain');
+        if (!dataStr) return;
+
+        const origem = JSON.parse(dataStr);
+        const chaveOrigem = `${origem.dia}-${origem.hora}`;
+        const chaveDestino = `${diaDestino}-${horaDestino}`;
+
+        // Aborta se soltar em cima da mesma célula
+        if (chaveOrigem === chaveDestino) return;
+
+        const horarioOrigemId = horariosIds[chaveOrigem];
+        const horarioDestinoId = horariosIds[chaveDestino];
+
+        if (!horarioDestinoId) {
+            alert("Este horário de destino não está vinculado a esta turma.");
+            return;
+        }
+
+        const celulaDestino = e.currentTarget;
+        const cardDestino = celulaDestino.querySelector('.card-aula');
+
+        let destinoDisciplinaId = null;
+        let destinoProfessoresIds = [];
+        let isSwap = false;
+
+        // Se a célula de destino já possuir um card, configura a ação de Permuta (Swap)
+        if (cardDestino) {
+            isSwap = true;
+            destinoDisciplinaId = cardDestino.getAttribute('data-disciplina-id') || null;
+            const profsStr = cardDestino.getAttribute('data-professores-ids');
+            destinoProfessoresIds = profsStr ? profsStr.split(',').map(Number) : [];
+        }
+
+        // 1ª Ação: Grava no Horário de Destino os dados que vieram do Card Arrastado (Origem)
+        const promessaDestino = fetch('/api/construtor/salvar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                turma_id: '{{ turma_selecionada.id }}',
+                horario_id: horarioDestinoId,
+                disciplina_id: origem.disciplina_id,
+                professores_ids: origem.professores_ids
+            })
+        });
+
+        // 2ª Ação: Atualiza a Origem (Se foi swap, ganha o card do destino. Se foi movimento livre, fica limpo/vazio)
+        const promessaOrigem = fetch('/api/construtor/salvar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                turma_id: '{{ turma_selecionada.id }}',
+                horario_id: horarioOrigemId,
+                disciplina_id: isSwap ? destinoDisciplinaId : null,
+                professores_ids: isSwap ? destinoProfessoresIds : []
+            })
+        });
+
+        // Executa ambas as operações assincronamente e força o reload imediato do banco de dados na tela
+        await Promise.all([promessaDestino, promessaOrigem]);
+        location.reload();
+    }
+
+    // =========================================================================
+    // LÓGICA DO MODAL TRADICIONAL
+    // =========================================================================
     function abrirModal(dia, hora, disciplinaId, professoresIds) {
         const chave = `${dia}-${hora}`;
         const horarioId = horariosIds[chave];
@@ -142,7 +250,6 @@
 
         document.getElementById('modalDia').value = dia;
         document.getElementById('modalHora').value = horarioId;
-        
         document.getElementById('modalDisciplina').value = disciplinaId || '';
         
         const profSelect = document.getElementById('modalProfessor');
