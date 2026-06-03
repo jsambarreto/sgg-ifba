@@ -1,0 +1,39 @@
+#python manage.py shell
+
+import csv
+from gestao.models import GradeHoraria
+
+# 1. Definir o nome do arquivo de saída
+nome_arquivo = 'grade_professores_nome_completo.csv'
+linhas_exclusivas = set()
+
+# 2. Buscar os dados com os otimizadores
+grades = GradeHoraria.objects.select_related('turma', 'disciplina').prefetch_related('professores')
+
+# 3. Filtrar as duplicadas coletando o nome completo
+for g in grades:
+    turma = g.turma.nome
+    disciplina = g.disciplina.nome if g.disciplina else '---'
+    
+    # Varre a tabela intermediária e junta os nomes completos com " / "
+    profs = g.professores.all()
+    if profs.exists():
+        professor = " / ".join([p.nome_completo for p in profs])
+    else:
+        professor = 'Sem Professor'
+    
+    # Guarda a tupla única
+    combinacao = (turma, professor, disciplina)
+    linhas_exclusivas.add(combinacao)
+
+# 4. Gravar os dados formatados no CSV
+with open(nome_arquivo, mode='w', encoding='utf-8', newline='') as file:
+    writer = csv.writer(file, delimiter=';')
+    
+    # Cabeçalho adaptado
+    writer.writerow(['Turma', 'Professor(es) - Nome Completo', 'Disciplina'])
+    
+    for turma, professor, disciplina in sorted(linhas_exclusivas):
+        writer.writerow([turma, professor, disciplina])
+
+print(f"🎉 Arquivo definitivo com nomes completos gerado: {nome_arquivo}")
