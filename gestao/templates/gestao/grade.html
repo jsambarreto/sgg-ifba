@@ -18,11 +18,10 @@
         transition: 0.2s; 
         box-shadow: 0 2px 4px rgba(26, 188, 156, 0.2); 
         
-        /* SOLUÇÃO PARA CONTROLE DE TEXTO */
-        word-break: break-word;      /* Força a quebra de palavras longas */
-        overflow: hidden;            /* Oculta o excedente */
+        word-break: break-word;      
+        overflow: hidden;            
         display: -webkit-box;
-        -webkit-line-clamp: 4;       /* Limita o card a no máximo 4 linhas de texto */
+        -webkit-line-clamp: 4;       
         -webkit-box-orient: vertical;
     }
     .card-aula:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(26, 188, 156, 0.3); }
@@ -35,7 +34,6 @@
             font-size: 0.85em; 
             color: #7f8c8d; 
             
-            /* SOLUÇÃO PARA CONTROLE DE TEXTO */
             word-break: break-word;
             overflow: hidden;
             display: -webkit-box;
@@ -121,7 +119,7 @@
                                     {% if chave in grade_pessoal_map %}
                                         {% with aula=grade_pessoal_map|get_item:chave %}
                                         
-                                        <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ aula|get_item:'turma' }}')">
+                                        <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ aula|get_item:'turma' }}', '{{ dia }}')">
                                             <strong style="display: block; color: #16a085;">{{ aula|get_item:'disciplina' }}</strong>
                                             <span style="color: #2c3e50;">{{ aula|get_item:'turma' }}</span>
                                             
@@ -139,7 +137,7 @@
                                     {% with aula=grade_turma_map|get_item:chave %}
                                         
                                         {% if aula|get_item:'is_minha_aula' %}
-                                            <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ turma_selecionada.nome }}')" title="Sua Aula - Clique para trocar">
+                                            <div class="card-aula" style="{% if aula|get_item:'cor' %}background-color: {{ aula|get_item:'cor' }}; border-color: #bdc3c7;{% endif %}" onclick="abrirAcaoAula('{{ aula|get_item:'id' }}', '{{ aula|get_item:'disciplina' }}', '{{ turma_selecionada.nome }}', '{{ dia }}')" title="Sua Aula - Clique para trocar">
                                                 <strong style="display: block; color: #16a085;">{{ aula|get_item:'disciplina' }}</strong>
                                                 <span style="color: #2c3e50; font-size: 0.9em;">(Você)</span>
                                                 
@@ -190,15 +188,16 @@
 </div>
 
 <script>
-    // Reaplica a mesma função de hash para manter a identidade visual unificada
+    // Recupera a data de início da semana em formato de String
+    const inicioSemanaStr = "{{ inicio_semana|date:'Y-m-d' }}";
+
     function aplicarCresPorPar() {
         document.querySelectorAll('.card-aula, .card-colega').forEach(card => {
-            // Se o card já recebeu uma cor de alerta/status do backend (como vermelho de falta), respeita a cor existente
             if (card.style.backgroundColor && card.style.backgroundColor !== 'transparent' && !card.style.backgroundColor.includes('rgb(232, 248, 245)')) {
                 return; 
             }
             
-            const texto = card.innerText; // Lê o conteúdo interno do card
+            const texto = card.innerText; 
             let hash = 0;
             for (let i = 0; i < texto.length; i++) {
                 hash = texto.charCodeAt(i) + ((hash << 5) - hash);
@@ -211,14 +210,28 @@
         });
     }
 
-    // Executa a pintura assim que a página terminar de carregar
     window.addEventListener('DOMContentLoaded', aplicarCresPorPar);
 
 
     let aulaSelecionadaId = null;
+    let dataCalculadaAula = null; // Variável global para armazenar a data da aula clicada
 
-    function abrirAcaoAula(aulaId, disciplina, turma) {
+    // ALTERADO: A função agora recebe o parâmetro 'dia' (2=Segunda, 3=Terça...)
+    function abrirAcaoAula(aulaId, disciplina, turma, dia) {
         aulaSelecionadaId = aulaId;
+        
+        // CONVERSÃO DINÂMICA DE DATA:
+        // Segunda-feira é o dia 2. O offset de dias a somar será (dia_clicado - 2)
+        const dataBase = new Date(inicioSemanaStr + 'T00:00:00');
+        const offsetDias = parseInt(dia) - 2;
+        dataBase.setDate(dataBase.getDate() + offsetDias);
+        
+        // Formata para o padrão ISO (YYYY-MM-DD) exigido pelos campos HTML5 de tipo data
+        const yyyy = dataBase.getFullYear();
+        const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+        const dd = String(dataBase.getDate()).padStart(2, '0');
+        dataCalculadaAula = `${yyyy}-${mm}-${dd}`;
+        
         document.getElementById('modalTitulo').innerText = disciplina + ' - ' + turma;
         document.getElementById('modalAcao').style.display = 'flex';
     }
@@ -226,11 +239,13 @@
     function fecharModal() {
         document.getElementById('modalAcao').style.display = 'none';
         aulaSelecionadaId = null;
+        dataCalculadaAula = null;
     }
 
+    // ALTERADO: O redirecionamento agora anexa a variável de data calculada via query string (?data=...)
     function redirecionarSolicitacao(tipo) {
-        if (aulaSelecionadaId) {
-            window.location.href = `/solicitar/${aulaSelecionadaId}/${tipo}/`;
+        if (aulaSelecionadaId && dataCalculadaAula) {
+            window.location.href = `/solicitar/${aulaSelecionadaId}/${tipo}/?data=${dataCalculadaAula}`;
         }
     }
 </script>

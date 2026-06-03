@@ -16,7 +16,7 @@
         
         <div style="margin-bottom: 15px;">
             <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #555;">Data da Ausência / Troca:</label>
-            <input type="date" name="data_aplicacao" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <input type="date" name="data_aplicacao" id="data_aplicacao" value="{{ request.GET.data }}" required class="form-control">
             <small style="color: #7f8c8d;">O dia exato em que você não dará esta aula.</small>
         </div>
 
