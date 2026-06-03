@@ -361,11 +361,47 @@ def relatorio_carga_horaria(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'professor') and request.user.professor.is_diretor)):
         raise PermissionDenied("Acesso restrito à Direção do Campus.")
 
-    professores = Professor.objects.annotate(
-        total_aulas=Count('grades_horarias')
-    ).order_by('-total_aulas') 
+    professores_lista = Professor.objects.all().order_by('nome_completo')
+    dados_professores = []
 
-    return render(request, 'gestao/relatorio_carga.html', {'professores': professores})
+    for prof in professores_lista:
+        aulas = prof.grades_horarias.select_related('horario', 'disciplina', 'turma').all()
+        total_aulas = aulas.count()
+        total_horas = 0.0
+        
+        ppa_contabilizados = set()
+
+        for aula in aulas:
+            if aula.disciplina:
+                nome_disc = aula.disciplina.nome.upper()
+                # Captura variações: "PPA", "PRÁTICA PROFISSIONAL" ou "PRATICA PROFISSIONAL"
+                if "PPA" in nome_disc or "PRÁTICA PROFISSIONAL" in nome_disc or "PRATICA PROFISSIONAL" in nome_disc:
+                    chave_ppa = (aula.turma_id, aula.disciplina_id)
+                    if chave_ppa not in ppa_contabilizados:
+                        total_horas += 0.75
+                        ppa_contabilizados.add(chave_ppa)
+                    continue
+
+            # Regra normal por cada aula física individual
+            if aula.horario.turno == 'N':    # Noturno: 50 min = 0.833h
+                total_horas += 50 / 60
+            else:                            # Matutino e Vespertino: 45 min = 0.75h
+                total_horas += 45 / 60
+
+        porcentagem = int((total_horas / 20) * 100) if total_horas > 0 else 0
+        if porcentagem > 100:
+            porcentagem = 100
+
+        dados_professores.append({
+            'professor': prof,
+            'total_aulas': total_aulas,
+            'total_horas': round(total_horas, 2),
+            'porcentagem': porcentagem
+        })
+
+    dados_professores.sort(key=lambda x: x['total_horas'], reverse=True)
+
+    return render(request, 'gestao/relatorio_carga.html', {'dados_professores': dados_professores})
 
 @login_required
 def pagina_inicial(request):
