@@ -84,7 +84,7 @@ def exibir_grade(request):
                 grade_pessoal_map[chave]['cor'] = '#d1ecf1' 
 
     entradas_sub = Solicitacao.objects.filter(professor_substituto=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='S')
-    for sol in entries_sub:
+    for sol in entradas_sub:
         chave = f"{sol.aula_origem.horario.dia_semana}-{sol.aula_origem.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
             'id': sol.aula_origem.id,
@@ -95,7 +95,7 @@ def exibir_grade(request):
         }
         
     entradas_perm = Solicitacao.objects.filter(aula_destino__professores=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='P')
-    for sol in entries_perm:
+    for sol in entradas_perm:
         chave = f"{sol.aula_destino.horario.dia_semana}-{sol.aula_destino.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
             'id': sol.aula_destino.id,
@@ -237,7 +237,7 @@ def api_processar_aprovacao(request):
                 solicitacao.save()
                 mensagem = "Solicitação rejeitada."
 
-            return JsonResponse({'sucesso': True, 'mensagem': message})
+            return JsonResponse({'sucesso': True, 'mensagem': mensagem})
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
@@ -309,9 +309,7 @@ def construtor_grade(request):
                 grade_map[chave] = {
                     'disciplina_id': item.disciplina.id if item.disciplina else '',
                     'disc': item.disciplina.nome if item.disciplina else "---",
-                    # Array com os IDs dos professores para marcar no modal
                     'professores_ids': [p.id for p in item.professores.all()],
-                    # String pronta para exibição "Jorge / Aline"
                     'professores_str': item.nomes_professores 
                 }
 
@@ -338,7 +336,6 @@ def api_salvar_aula_base(request):
             excluir = dados.get('excluir', False)
             disc_id = dados.get('disciplina_id') or None
 
-            # INTELIGÊNCIA DE REMOÇÃO: Se for comando explícito ou arrastado sem destino (limpeza automática)
             if excluir or not disc_id:
                 GradeHoraria.objects.filter(turma_id=turma_id, horario_id=horario_id).delete()
                 return JsonResponse({"sucesso": True, "removido": True})
@@ -372,20 +369,15 @@ def relatorio_carga_horaria(request):
 
 @login_required
 def pagina_inicial(request):
-    """
-    Dashboard principal. Renderiza atalhos e agora o BANCO DE AULAS (Créditos e Dívidas).
-    """
     prof = getattr(request.user, 'professor', None)
     dividas = []
     creditos = []
     
     if prof:
-        # Aulas que eu pedi substituição "A Combinar" e ainda não devolvi
         dividas = Solicitacao.objects.filter(
             solicitante=prof, status='A', devolucao_pendente=True
         ).exclude(tipo='L').order_by('data_aplicacao')
 
-        # Aulas que eu cobri alguém e ainda não me pagaram
         creditos_sub = Solicitacao.objects.filter(
             professor_substituto=prof, status='A', devolucao_pendente=True
         )
@@ -486,7 +478,6 @@ def nova_solicitacao(request, aula_id, tipo):
         data_aplicacao = request.POST.get('data_aplicacao')
         carater = request.POST.get('carater', 'T') 
         
-        # --- LÓGICA DE DEVOLUÇÃO (SISTEMA DE CRÉDITO) ---
         data_devolucao_post = request.POST.get('data_devolucao')
         a_combinar = request.POST.get('a_combinar') == 'on' 
         
@@ -524,7 +515,7 @@ def nova_solicitacao(request, aula_id, tipo):
             assunto = f"⏳ Novo Pedido de {nome_tipo} - {professor_logado.nome_completo}"
             mensagem = f"""Olá, Coordenação. Foi feito um pedido de {nome_tipo}. Acesse o sistema."""
             destinatarios = ['informatica.euc@ifba.edu.br']
-            send_mail(assunto, message, settings.DEFAULT_FROM_EMAIL, destinatarios, fail_silently=True)
+            send_mail(assunto, mensagem, settings.DEFAULT_FROM_EMAIL, destinatarios, fail_silently=True)
         except Exception as e:
             print(f"Erro e-mail: {e}")
             
@@ -571,9 +562,6 @@ def api_informar_pagamento(request):
 
 @login_required
 def simulador_grade(request):
-    """
-    Renderiza a interface de arrastar e soltar para os coordenadores e diretores.
-    """
     prof = getattr(request.user, 'professor', None)
     if not request.user.is_superuser and not (prof and (prof.is_coordenador or prof.is_diretor)):
         raise PermissionDenied("Acesso restrito à Coordenação e Direção do Campus.")
