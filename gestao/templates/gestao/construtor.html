@@ -116,7 +116,8 @@
         </select>
 
         <div style="display: flex; gap: 10px; margin-top: 25px;">
-            <button onclick="fecharModal()" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
+            <button id="btnExcluirModal" onclick="excluirAula()" style="display: none; flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">❌ Excluir</button>
+            <button onclick="fecharModal()" style="flex: 1; padding: 10px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
             <button onclick="salvarAula()" style="flex: 2; padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">💾 Gravar no Sistema</button>
         </div>
     </div>
@@ -127,7 +128,6 @@
     let horariosIds = {};
     try { horariosIds = JSON.parse(horariosData); } catch (e) {}
 
-    // Algoritmo dinâmico de coloração idêntico ao do simulador
     function obterCorPorPar(professorStr, disciplina) {
         if (!disciplina || disciplina === '---') return '#ffffff';
         const textoCombinado = professorStr + disciplina;
@@ -147,11 +147,7 @@
         });
     });
 
-    // =========================================================================
-    // INTELIGÊNCIA DE ARRASTAR E SOLTAR (DRAG AND DROP) PERSISTENTE
-    // =========================================================================
     function dragStart(e, dia, hora, disciplinaId, professoresIdsStr) {
-        // Compacta todas as informações da célula de origem num objeto de transporte JSON
         const payloadOrigem = {
             dia: dia,
             hora: hora,
@@ -161,14 +157,8 @@
         e.dataTransfer.setData('text/plain', JSON.stringify(payloadOrigem));
     }
 
-    function allowDrop(e) {
-        e.preventDefault();
-        e.currentTarget.classList.add('dropzone-hover');
-    }
-
-    function dragLeave(e) {
-        e.currentTarget.classList.remove('dropzone-hover');
-    }
+    function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('dropzone-hover'); }
+    function dragLeave(e) { e.currentTarget.classList.remove('dropzone-hover'); }
 
     async function drop(e, diaDestino, horaDestino) {
         e.preventDefault();
@@ -181,7 +171,6 @@
         const chaveOrigem = `${origem.dia}-${origem.hora}`;
         const chaveDestino = `${diaDestino}-${horaDestino}`;
 
-        // Aborta se soltar em cima da mesma célula
         if (chaveOrigem === chaveDestino) return;
 
         const horarioOrigemId = horariosIds[chaveOrigem];
@@ -199,7 +188,6 @@
         let destinoProfessoresIds = [];
         let isSwap = false;
 
-        // Se a célula de destino já possuir um card, configura a ação de Permuta (Swap)
         if (cardDestino) {
             isSwap = true;
             destinoDisciplinaId = cardDestino.getAttribute('data-disciplina-id') || null;
@@ -207,7 +195,6 @@
             destinoProfessoresIds = profsStr ? profsStr.split(',').map(Number) : [];
         }
 
-        // 1ª Ação: Grava no Horário de Destino os dados que vieram do Card Arrastado (Origem)
         const promessaDestino = fetch('/api/construtor/salvar/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
@@ -219,7 +206,6 @@
             })
         });
 
-        // 2ª Ação: Atualiza a Origem (Se foi swap, ganha o card do destino. Se foi movimento livre, fica limpo/vazio)
         const promessaOrigem = fetch('/api/construtor/salvar/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
@@ -231,14 +217,10 @@
             })
         });
 
-        // Executa ambas as operações assincronamente e força o reload imediato do banco de dados na tela
         await Promise.all([promessaDestino, promessaOrigem]);
         location.reload();
     }
 
-    // =========================================================================
-    // LÓGICA DO MODAL TRADICIONAL
-    // =========================================================================
     function abrirModal(dia, hora, disciplinaId, professoresIds) {
         const chave = `${dia}-${hora}`;
         const horarioId = horariosIds[chave];
@@ -252,6 +234,14 @@
         document.getElementById('modalHora').value = horarioId;
         document.getElementById('modalDisciplina').value = disciplinaId || '';
         
+        // Exibe ou oculta o botão Excluir com base na existência prévia da aula
+        const btnExcluir = document.getElementById('btnExcluirModal');
+        if (disciplinaId) {
+            btnExcluir.style.display = 'block';
+        } else {
+            btnExcluir.style.display = 'none';
+        }
+
         const profSelect = document.getElementById('modalProfessor');
         Array.from(profSelect.options).forEach(opt => {
             opt.selected = professoresIds && professoresIds.includes(parseInt(opt.value));
@@ -274,6 +264,25 @@
         if (!payload.disciplina_id) {
             alert("Por favor, selecione a disciplina!"); return;
         }
+
+        const response = await fetch('/api/construtor/salvar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(payload)
+        });
+
+        if ((await response.json()).sucesso) location.reload();
+    }
+
+    // NOVA FUNÇÃO: Dispara a deleção explícita no banco
+    async function excluirAula() {
+        if (!confirm("Tem a certeza de que deseja remover esta aula da grade base? O horário ficará livre.")) return;
+
+        const payload = {
+            turma_id: '{{ turma_selecionada.id }}',
+            horario_id: document.getElementById('modalHora').value,
+            excluir: true
+        };
 
         const response = await fetch('/api/construtor/salvar/', {
             method: 'POST',

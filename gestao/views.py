@@ -84,7 +84,7 @@ def exibir_grade(request):
                 grade_pessoal_map[chave]['cor'] = '#d1ecf1' 
 
     entradas_sub = Solicitacao.objects.filter(professor_substituto=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='S')
-    for sol in entradas_sub:
+    for sol in entries_sub:
         chave = f"{sol.aula_origem.horario.dia_semana}-{sol.aula_origem.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
             'id': sol.aula_origem.id,
@@ -95,7 +95,7 @@ def exibir_grade(request):
         }
         
     entradas_perm = Solicitacao.objects.filter(aula_destino__professores=professor_logado, status='A', data_aplicacao__range=[inicio_semana, fim_semana], tipo='P')
-    for sol in entradas_perm:
+    for sol in entries_perm:
         chave = f"{sol.aula_destino.horario.dia_semana}-{sol.aula_destino.horario.hora_inicio.strftime('%H:%M')}"
         grade_pessoal_map[chave] = {
             'id': sol.aula_destino.id,
@@ -237,7 +237,7 @@ def api_processar_aprovacao(request):
                 solicitacao.save()
                 mensagem = "Solicitação rejeitada."
 
-            return JsonResponse({'sucesso': True, 'mensagem': mensagem})
+            return JsonResponse({'sucesso': True, 'mensagem': message})
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
@@ -333,10 +333,20 @@ def api_salvar_aula_base(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
+            turma_id = dados.get('turma_id')
+            horario_id = dados.get('horario_id')
+            excluir = dados.get('excluir', False)
+            disc_id = dados.get('disciplina_id') or None
+
+            # INTELIGÊNCIA DE REMOÇÃO: Se for comando explícito ou arrastado sem destino (limpeza automática)
+            if excluir or not disc_id:
+                GradeHoraria.objects.filter(turma_id=turma_id, horario_id=horario_id).delete()
+                return JsonResponse({"sucesso": True, "removido": True})
+
             aula, created = GradeHoraria.objects.update_or_create(
-                turma_id=dados.get('turma_id'),
-                horario_id=dados.get('horario_id'),
-                defaults={'disciplina_id': dados.get('disciplina_id')}
+                turma_id=turma_id,
+                horario_id=horario_id,
+                defaults={'disciplina_id': disc_id}
             )
             prof_ids = dados.get('professores_ids', [])
             if prof_ids:
