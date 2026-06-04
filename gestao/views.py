@@ -514,6 +514,29 @@ def nova_solicitacao(request, aula_id, tipo):
         data_aplicacao = request.POST.get('data_aplicacao')
         carater = request.POST.get('carater', 'T') 
         
+        # ==========================================================
+        # NOVA TRAVA DE SEGURANÇA: Bloqueio de Duplicidade
+        # ==========================================================
+        solicitacao_duplicada = Solicitacao.objects.filter(
+            aula_origem=aula_origem,
+            data_aplicacao=data_aplicacao,
+            status__in=['P', 'A'] # Bloqueia se já houver uma Pendente ou Aprovada
+        ).first()
+
+        if solicitacao_duplicada:
+            # Renderiza um ecrã de aviso amigável sem quebrar o sistema
+            return HttpResponse(
+                f"<div style='font-family: sans-serif; padding: 40px; text-align: center; color: #333; max-width: 600px; margin: 0 auto;'>"
+                f"<h2 style='color: #e74c3c;'>⚠️ Solicitação Duplicada</h2>"
+                f"<p style='font-size: 1.1em;'>O sistema identificou que já existe um pedido de <strong>{solicitacao_duplicada.get_tipo_display()}</strong> "
+                f"({solicitacao_duplicada.get_status_display()}) registado para esta disciplina na data <strong>{data_aplicacao}</strong>.</p>"
+                f"<p style='color: #7f8c8d;'>Aceda a 'Minhas Permutas' para gerir ou cancelar a solicitação existente antes de tentar criar uma nova.</p>"
+                f"<button onclick='window.history.back()' style='padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 1em;'>⬅️ Voltar e Corrigir</button>"
+                f"</div>", status=400
+            )
+        # ==========================================================
+        
+        # --- LÓGICA DE DEVOLUÇÃO (SISTEMA DE CRÉDITO) ---
         data_devolucao_post = request.POST.get('data_devolucao')
         a_combinar = request.POST.get('a_combinar') == 'on' 
         
