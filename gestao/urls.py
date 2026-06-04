@@ -21,5 +21,7 @@ urlpatterns = [
     path('api/pagar/', views.api_informar_pagamento, name='api_informar_pagamento'),
     path('simulador/', views.simulador_grade, name='simulador_grade'),
     path('simulador/exportar-pdf/', views.exportar_pdf_simulacao, name='exportar_pdf_simulacao'),
+    path('api/solicitacao/cancelar/<int:id>/', views.api_cancelar_solicitacao, name='api_cancelar_solicitacao'),
+    path('solicitacao/editar/<int:id>/', views.editar_solicitacao, name='editar_solicitacao'),
 ]
 

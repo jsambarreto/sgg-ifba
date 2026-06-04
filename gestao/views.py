@@ -690,3 +690,52 @@ def exportar_pdf_simulacao(request):
             return HttpResponse(f"Erro interno no motor de PDF: {str(e)}", status=500)
             
     return HttpResponse("Método não permitido.", status=405)
+
+@login_required
+def api_cancelar_solicitacao(request, id):
+    """
+    Exclui uma solicitação do banco de dados caso ainda esteja Pendente
+    e pertença ao professor que está logado.
+    """
+    if request.method == 'POST':
+        try:
+            prof = getattr(request.user, 'professor', None)
+            if not prof:
+                return JsonResponse({'sucesso': False, 'erro': 'Utilizador sem perfil de professor.'})
+            
+            # Busca a solicitação, garantindo que é do próprio professor
+            solicitacao = get_object_or_404(Solicitacao, id=id, solicitante=prof)
+            
+            if solicitacao.status != 'P':
+                return JsonResponse({'sucesso': False, 'erro': 'Apenas solicitações pendentes podem ser canceladas.'})
+            
+            # Apaga o registo do banco de dados
+            solicitacao.delete()
+            
+            return JsonResponse({'sucesso': True})
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+            
+    return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
+
+@login_required
+def editar_solicitacao(request, id):
+    """
+    Rota temporária para a edição. 
+    Como a reconstrução do formulário complexo leva tempo, por enquanto 
+    orientamos o utilizador a cancelar e refazer.
+    """
+    prof = getattr(request.user, 'professor', None)
+    solicitacao = get_object_or_404(Solicitacao, id=id, solicitante=prof)
+    
+    if solicitacao.status != 'P':
+        return HttpResponse("Apenas solicitações pendentes podem ser editadas.", status=403)
+        
+    return HttpResponse(
+        "<div style='font-family: sans-serif; padding: 40px; text-align: center; color: #333;'>"
+        "<h2>🛠️ Edição em Desenvolvimento</h2>"
+        "<p>A interface de edição direta está a ser construída.</p>"
+        "<p>Por favor, volte atrás, <strong>cancele a solicitação incorreta</strong> e crie uma nova com os dados corretos.</p>"
+        "<button onclick='window.history.back()' style='padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;'>Voltar</button>"
+        "</div>"
+    )
