@@ -36,7 +36,7 @@
                     <th>Professor</th>
                     <th style="width: 15%;">Quantidade de Aulas</th>
                     <th style="width: 18%;">Tempo Real (Horas Relógio)</th>
-                    <th style="width: 35%;">Nível de Ocupação (Ref: 20h)</th>
+                    <th style="width: 35%;">Nível de Ocupação (Ref: 15h)</th>
                 </tr>
             </thead>
             <tbody>
@@ -48,8 +48,8 @@
                     <td>
                         <div class="barra-fundo" title="Ocupação: {{ item.porcentagem }}%">
                             <div class="barra-preenchimento 
-                                {% if item.total_horas >= 16 %}carga-alta
-                                {% elif item.total_horas >= 8 %}carga-media
+                                {% if item.total_horas >= 13 %}carga-alta
+                                {% elif item.total_horas >= 10 %}carga-media
                                 {% else %}carga-baixa{% endif %}" 
                                 style="width: {{ item.porcentagem }}%;">
                             </div>

@@ -388,7 +388,7 @@ def relatorio_carga_horaria(request):
             else:                            # Matutino e Vespertino: 45 min = 0.75h
                 total_horas += 45 / 60
 
-        porcentagem = int((total_horas / 20) * 100) if total_horas > 0 else 0
+        porcentagem = int((total_horas / 15) * 100) if total_horas > 0 else 0
         if porcentagem > 100:
             porcentagem = 100
 
