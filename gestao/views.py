@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse,HttpResponseForbidden,JsonResponse
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
 from xhtml2pdf import pisa
 from django.core.mail import send_mail 
 from django.utils import timezone
