@@ -818,3 +818,42 @@ def confirmar_execucao(request, solicitacao_id, tipo):
         
     solicitacao.save()
     return redirect('relatorio_gerencial')
+
+# Certifique-se de ter importado timezone e render_to_string no topo do seu views.py:
+# from django.utils import timezone
+# from django.template.loader import render_to_string
+
+@login_required
+def gerar_pdf_relatorio_gerencial(request):
+    if not (request.user.professor.is_coordenador or request.user.professor.is_diretor):
+        return HttpResponseForbidden("Acesso restrito.")
+
+    hoje = timezone.now().date()
+    
+    # Busca todas as solicitações já aprovadas pela coordenação
+    solicitacoes_aprovadas = Solicitacao.objects.filter(status='A')
+    
+    # Separa em Pendentes de Validação (aplicação_realizada = False) e Validadas (True)
+    pendentes = solicitacoes_aprovadas.filter(aplicacao_realizada=False).order_by('data_aplicacao')
+    validadas = solicitacoes_aprovadas.filter(aplicacao_realizada=True).order_by('-data_aplicacao')
+    
+    context = {
+        'pendentes': pendentes,
+        'validadas': validadas,
+        'total_pendentes': pendentes.count(),
+        'total_validadas': validadas.count(),
+        'data_geracao': timezone.now(),
+        'request': request, # Passa o request para podermos acessar o usuário no template
+    }
+    
+    html = render_to_string('gestao/pdf_relatorio_gerencial.html', context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'filename="relatorio_gerencial_permutas_{hoje.strftime("%Y%m%d")}.pdf"'
+    
+    # Renderiza o PDF (presumindo que a variável `pisa` já está importada no seu views.py)
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    
+    if pisa_status.err:
+        return HttpResponse('Erro ao gerar o Relatório PDF', status=500)
+    
+    return response

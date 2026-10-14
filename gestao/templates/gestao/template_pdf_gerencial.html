@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm 1.5cm 2.5cm 1.5cm;
+            @frame footer {
+                -pdf-frame-content: footerContent;
+                bottom: 1cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 1cm;
+            }
+        }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 10px; line-height: 1.3; }
+        
+        .header { text-align: center; margin-bottom: 15px; }
+        .titulo { font-weight: bold; font-size: 13px; text-decoration: underline; margin-bottom: 20px; }
+        
+        .resumo-box { 
+            border: 1px solid #333; 
+            background-color: #f9f9f9; 
+            padding: 10px; 
+            margin-bottom: 20px; 
+            width: 100%;
+        }
+        .resumo-box td { border: none; padding: 2px 10px; font-size: 11px; text-align: left; }
+        
+        table.dados { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        table.dados th, table.dados td { border: 1px solid #444; padding: 6px; text-align: center; }
+        table.dados th { background-color: #e0e0e0; font-weight: bold; font-size: 10px; }
+        
+        .secao-titulo { 
+            font-weight: bold; 
+            font-size: 11px; 
+            margin-bottom: 8px; 
+            background-color: #333; 
+            color: #fff;
+            padding: 5px; 
+            text-align: center; 
+        }
+        
+        .badge-pendente { color: #d9534f; font-weight: bold; }
+        .badge-ok { color: #5cb85c; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQdenroWtf5zSBMFqXZclW2eeoksxpfdh6A6g&s" width="60" height="60"><br>
+        <strong>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DA BAHIA</strong><br>
+        SISTEMA DE GESTÃO DE GRADES (SGG)
+    </div>
+
+    <div class="header titulo">
+        RELATÓRIO GERENCIAL DE PERMUTAS E AUSÊNCIAS
+    </div>
+
+    <table class="resumo-box">
+        <tr>
+            <td><strong>Data de Geração:</strong> {{ data_geracao|date:"d/m/Y \à\s H:i" }}</td>
+            <td><strong>Total Pendentes de Validação:</strong> {{ total_pendentes }}</td>
+        </tr>
+        <tr>
+            <td><strong>Gerado por:</strong> {{ request.user.professor.nome_completo|default:"Coordenação" }}</td>
+            <td><strong>Total de Ocorrências Validadas:</strong> {{ total_validadas }}</td>
+        </tr>
+    </table>
+
+    <!-- SESSÃO 1: PENDENTES -->
+    <div class="secao-titulo">1. PERMUTAS E AUSÊNCIAS PENDENTES DE VALIDAÇÃO (NÃO CONFIRMADAS)</div>
+    <table class="dados">
+        <thead>
+            <tr>
+                <th width="12%">Data Planejada</th>
+                <th width="25%">Professor Ausente</th>
+                <th width="28%">Disciplina Origem</th>
+                <th width="25%">Substituto / Destino</th>
+                <th width="10%">Status Carga</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sol in pendentes %}
+            <tr>
+                <td>{{ sol.data_aplicacao|date:"d/m/Y"|default:"-" }}</td>
+                <td>{{ sol.solicitante.nome_completo|default:"-" }}</td>
+                <td>
+                    {% if sol.aula_origem and sol.aula_origem.disciplina %}
+                        {{ sol.aula_origem.disciplina.nome }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.tipo == 'P' and sol.aula_destino %}
+                        {{ sol.aula_destino.nomes_professores }}
+                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
+                        {{ sol.professor_substituto.nome_completo }}
+                    {% else %}
+                        Sem substituto
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge-pendente">A Confirmar</span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">Nenhuma solicitação pendente de validação no momento.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- SESSÃO 2: VALIDADAS (HISTÓRICO) -->
+    <div class="secao-titulo" style="page-break-before: auto;">2. PERMUTAS E AUSÊNCIAS VALIDADAS (HISTÓRICO)</div>
+    <table class="dados">
+        <thead>
+            <tr>
+                <th width="12%">Data Ocorrência</th>
+                <th width="25%">Professor Ausente</th>
+                <th width="28%">Disciplina Origem</th>
+                <th width="20%">Substituto / Destino</th>
+                <th width="15%">Reposição</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sol in validadas %}
+            <tr>
+                <td>{{ sol.data_aplicacao|date:"d/m/Y"|default:"-" }}</td>
+                <td>{{ sol.solicitante.nome_completo|default:"-" }}</td>
+                <td>
+                    {% if sol.aula_origem and sol.aula_origem.disciplina %}
+                        {{ sol.aula_origem.disciplina.nome }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.tipo == 'P' and sol.aula_destino %}
+                        {{ sol.aula_destino.nomes_professores }}
+                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
+                        {{ sol.professor_substituto.nome_completo }}
+                    {% else %}
+                        Sem substituto
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.devolucao_pendente %}
+                        {% if sol.devolucao_realizada %}
+                            <span class="badge-ok">Concluída<br>({{ sol.data_devolucao|date:"d/m/Y" }})</span>
+                        {% else %}
+                            <span class="badge-pendente">Devendo Carga</span>
+                        {% endif %}
+                    {% else %}
+                        <span>N/A (Permuta)</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">Nenhum registro validado até o momento.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div id="footerContent" style="text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ccc; padding-top: 5px;">
+        Documento gerado pelo Sistema de Gestão de Grades (SGG) - IFBA | Página <pdf:pagenumber> de <pdf:pagecount>
+    </div>
+</body>
+</html>
