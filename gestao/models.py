@@ -100,6 +100,21 @@ class Solicitacao(models.Model):
     professor_substituto = models.ForeignKey(Professor, related_name='substituicoes', null=True, blank=True, on_delete=models.CASCADE)
     disciplina_substituta = models.ForeignKey(Disciplina, related_name='substituicoes_disciplina', null=True, blank=True, on_delete=models.CASCADE)
 
+    # --- VALIDAÇÃO DA COORDENAÇÃO ---
+    aplicacao_realizada = models.BooleanField(
+        default=False, 
+        help_text="Coordenador atesta se a ausência/troca inicial ocorreu"
+    )
+    devolucao_realizada = models.BooleanField(
+        default=False, 
+        help_text="Coordenador atesta se a reposição/devolução ocorreu"
+    )
+    observacoes_coordenacao = models.TextField(
+        blank=True, 
+        null=True, 
+        help_text="Anotações do gestor sobre faltas, atrasos ou carga devida"
+    )
+
 class DiaNaoLetivo(models.Model):
     data = models.DateField(unique=True, help_text="Data do feriado, recesso ou conselho de classe.")
     descricao = models.CharField(max_length=100, help_text="Ex: Feriado Nacional, Recesso Escolar, etc.")

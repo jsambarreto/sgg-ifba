@@ -1,0 +1,86 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Relatório Gerencial de Permutas e Frequência</h2>
+    
+    <!-- BLOCO 1: PENDENTES DE VALIDAÇÃO -->
+    <div class="card border-warning mb-4">
+        <div class="card-header bg-warning text-dark">
+            Aulas Passadas Pendentes de Confirmação
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Data Planejada</th>
+                        <th>Professor Ausente</th>
+                        <th>Substituto/Destino</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sol in pendentes_validacao %}
+                    <tr>
+                        <td>{{ sol.data_aplicacao|date:"d/m/Y" }}</td>
+                        <td>{{ sol.solicitante.nome_completo }}</td>
+                        <td>
+                            {% if sol.tipo == 'P' %}{{ sol.aula_destino.nomes_professores }}
+                            {% else %}{{ sol.professor_substituto.nome_completo|default:"Sem substituto" }}{% endif %}
+                        </td>
+                        <td>
+                            <form action="{% url 'confirmar_execucao' sol.id 'aplicacao' %}" method="POST">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success">Confirmar Ocorrência</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center">Tudo validado!</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- BLOCO 2: CARGA HORÁRIA DEVIDA -->
+    <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white">
+            Carga Horária Devida (Débitos Pendentes)
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Professores que se ausentaram (sem permuta casada) e ainda precisam repor a carga horária.</p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Professor Devedor</th>
+                        <th>Data da Falta original</th>
+                        <th>Disciplina</th>
+                        <th>Data Combinada Reposição</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sol in carga_devida %}
+                    <tr>
+                        <td><strong>{{ sol.solicitante.nome_completo }}</strong></td>
+                        <td>{{ sol.data_aplicacao|date:"d/m/Y" }}</td>
+                        <td>{{ sol.aula_origem.disciplina.nome }}</td>
+                        <td>{{ sol.data_devolucao|date:"d/m/Y"|default:"Ainda não marcada" }}</td>
+                        <td>
+                            <form action="{% url 'confirmar_execucao' sol.id 'devolucao' %}" method="POST">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Marcar Reposição Concluída</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center">Nenhuma carga devida pendente no momento.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

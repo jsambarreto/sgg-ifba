@@ -1,5 +1,4 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
 import json
 from .models import GradeHoraria, Turma, Horario, Solicitacao, Professor, Disciplina, DiaNaoLetivo
 from .services import gerar_grade_vazia_para_turma, processar_permuta, processar_acao_modal
@@ -9,10 +8,11 @@ from .decorators import apenas_coordenadores, apenas_gestores, apenas_diretores
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
+from django.http import HttpResponse,HttpResponseForbidden,JsonResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.core.mail import send_mail 
+from django.utils import timezone
 from django.conf import settings  
 
 @login_required
@@ -762,3 +762,59 @@ def editar_solicitacao(request, id):
         "<button onclick='window.history.back()' style='padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;'>Voltar</button>"
         "</div>"
     )
+
+@login_required
+def relatorio_gerencial(request):
+    # Trava de segurança: apenas coordenadores ou diretores acessam
+    if not (request.user.professor.is_coordenador or request.user.professor.is_diretor):
+        return HttpResponseForbidden("Acesso restrito à gestão de ensino.")
+
+    hoje = timezone.now().date()
+
+    # 1. Agendadas (Futuras): Aprovadas e com data de aplicação para hoje ou futuro
+    agendadas = Solicitacao.objects.filter(
+        status='A', 
+        data_aplicacao__gte=hoje
+    ).order_by('data_aplicacao')
+
+    # 2. Pendentes de Validação (Passadas): Já passaram da data, mas o coordenador não deu "ok"
+    pendentes_validacao = Solicitacao.objects.filter(
+        status='A', 
+        data_aplicacao__lt=hoje, 
+        aplicacao_realizada=False
+    ).order_by('data_aplicacao')
+
+    # 3. Carga Horária Devida (Ausências sem permuta ou sem reposição validada)
+    # Traz tudo que foi marcado como devolucao_pendente=True, mas que ainda não teve a devolucao_realizada=True
+    carga_devida = Solicitacao.objects.filter(
+        status='A', 
+        devolucao_pendente=True, 
+        devolucao_realizada=False
+    ).order_by('data_aplicacao')
+
+    context = {
+        'agendadas': agendadas,
+        'pendentes_validacao': pendentes_validacao,
+        'carga_devida': carga_devida,
+    }
+    return render(request, 'gestao/relatorio_gerencial.html', context)
+
+
+@login_required
+def confirmar_execucao(request, solicitacao_id, tipo):
+    """
+    Função rápida (ação de botão) para o coordenador dar o 'check' na aula.
+    tipo pode ser 'aplicacao' ou 'devolucao'.
+    """
+    if not (request.user.professor.is_coordenador or request.user.professor.is_diretor):
+        return HttpResponseForbidden("Acesso restrito.")
+        
+    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
+    
+    if tipo == 'aplicacao':
+        solicitacao.aplicacao_realizada = True
+    elif tipo == 'devolucao':
+        solicitacao.devolucao_realizada = True
+        
+    solicitacao.save()
+    return redirect('relatorio_gerencial')
