@@ -14,6 +14,7 @@ from xhtml2pdf import pisa
 from django.core.mail import send_mail 
 from django.utils import timezone
 from django.conf import settings  
+import calendar
 
 @login_required
 def exibir_grade(request):
@@ -829,6 +830,31 @@ def gerar_pdf_relatorio_gerencial(request):
         return HttpResponseForbidden("Acesso restrito.")
 
     hoje = timezone.now().date()
+    mes = int(request.GET.get('mes', hoje.month))
+    ano = int(request.GET.get('ano', hoje.year))
+
+    # Calcula o último dia do mês
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    data_inicio = timezone.datetime(ano, mes, 1).date()
+    data_fim = timezone.datetime(ano, mes, ultimo_dia).date()
+
+    # Busca TODAS as solicitações (Aprovadas) que ocorrem neste mês
+    # Filtramos pela data_aplicacao
+    solicitacoes = Solicitacao.objects.filter(
+        status='A',
+        data_aplicacao__gte=data_inicio,
+        data_aplicacao__lte=data_fim
+    ).order_by('data_aplicacao')
+
+    nome_mes = calendar.month_name[mes] # Se quiser em português, precisará do locale configurado
+
+    context = {
+        'hoje': hoje,
+        'mes_relatorio': mes,
+        'ano_relatorio': ano,
+        'solicitacoes': solicitacoes,
+        'total': solicitacoes.count(),
+    }
     
     # Busca todas as solicitações já aprovadas pela coordenação
     solicitacoes_aprovadas = Solicitacao.objects.filter(status='A')

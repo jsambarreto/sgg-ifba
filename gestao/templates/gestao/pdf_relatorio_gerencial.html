@@ -7,20 +7,15 @@
         body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #333; }
         
         .cabecalho-mec { text-align: center; font-weight: bold; margin-bottom: 20px; line-height: 1.2; font-size: 12px; }
-        .titulo { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 20px; text-transform: uppercase; }
+        .titulo { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; }
+        .subtitulo { text-align: center; font-weight: bold; font-size: 12px; margin-bottom: 20px; color: #555; }
         
         .resumo-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; background-color: #f9f9f9; text-align: center; }
-        .resumo-item { display: inline-block; width: 30%; font-size: 12px; }
-        
-        .secao-titulo { font-weight: bold; font-size: 12px; margin-top: 20px; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px; }
+        .resumo-item { display: inline-block; width: 45%; font-size: 12px; }
         
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #777; padding: 6px; text-align: center; font-size: 10px; }
         th { background-color: #e9ecef; font-weight: bold; }
-        
-        .status-pendente { color: #856404; font-weight: bold; }
-        .status-ok { color: #155724; font-weight: bold; }
-        .status-devendo { color: #721c24; font-weight: bold; }
         
         .assinatura-box { margin-top: 40px; text-align: center; }
         .linha-assinatura { border-top: 1px solid #000; width: 300px; margin: 0 auto; margin-top: 40px; margin-bottom: 5px; }
@@ -34,28 +29,28 @@
         INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DA BAHIA
     </div>
 
-    <div class="titulo">Relatório Gerencial de Permutas e Frequência Docente</div>
+    <div class="titulo">Relatório Mensal de Permutas e Frequência Docente</div>
+    <div class="subtitulo">Período de Referência: {{ mes_relatorio|stringformat:"02d" }}/{{ ano_relatorio }}</div>
 
     <div class="resumo-box">
         <div class="resumo-item"><strong>Data de Emissão:</strong> {{ hoje|date:"d/m/Y" }}</div>
-        <div class="resumo-item"><strong>Aulas a Validar:</strong> {{ pendentes_validacao|length }}</div>
-        <div class="resumo-item"><strong>Débitos de Carga:</strong> <span class="status-devendo">{{ carga_devida|length }}</span></div>
+        <div class="resumo-item"><strong>Total de Ocorrências no Mês:</strong> {{ total }}</div>
     </div>
 
-    <!-- SEÇÃO 1: PENDENTES DE VALIDAÇÃO (Aulas que já passaram da data mas não tiveram check) -->
-    <div class="secao-titulo">1. Aulas Passadas Pendentes de Confirmação de Ocorrência</div>
     <table>
         <thead>
             <tr>
-                <th style="width: 10%;">Data Planejada</th>
-                <th style="width: 25%;">Professor Ausente (Solicitante)</th>
-                <th style="width: 20%;">Disciplina (Origem)</th>
-                <th style="width: 25%;">Substituto / Cederá Horário</th>
-                <th style="width: 20%;">Ação Requerida</th>
+                <th style="width: 8%;">Data</th>
+                <th style="width: 20%;">Prof. Ausente</th>
+                <th style="width: 15%;">Disciplina Afetada</th>
+                <th style="width: 20%;">Substituto / Grade Destino</th>
+                <th style="width: 8%;">Reposição</th>
+                <th style="width: 14%;">Tipo do Ajuste</th>
+                <th style="width: 15%;">Situação (Validação)</th>
             </tr>
         </thead>
         <tbody>
-            {% for sol in pendentes_validacao %}
+            {% for sol in solicitacoes %}
             <tr>
                 <td>{{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }}</td>
                 <td>{{ sol.solicitante.nome_completo|default:"&nbsp;" }}</td>
@@ -79,68 +74,27 @@
                         &nbsp;
                     {% endif %}
                 </td>
-                <td class="status-pendente">Aguardando Validação</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5">Nenhuma aula pendente de validação de ocorrência.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- SEÇÃO 2: HISTÓRICO E VALIDADAS (Aulas que já tiveram o check de aplicação) -->
-    <div class="secao-titulo">2. Histórico de Ocorrências Validadas e Carga Horária Devida</div>
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 10%;">Data da Falta</th>
-                <th style="width: 25%;">Professor</th>
-                <th style="width: 25%;">Substituto na Ocorrência</th>
-                <th style="width: 15%;">Data Reposição</th>
-                <th style="width: 25%;">Situação da Carga Horária</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for sol in historico_validadas %}
-            <tr>
-                <td>{{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }}</td>
-                <td>{{ sol.solicitante.nome_completo|default:"&nbsp;" }}</td>
                 <td>
-                    {% if sol.tipo == 'P' and sol.aula_destino %}
-                        {% for prof in sol.aula_destino.professores.all %}
-                            {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
-                        {% empty %}
-                            &nbsp;
-                        {% endfor %}
-                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
-                        {{ sol.professor_substituto.nome_completo }}
-                    {% else %}
-                        &nbsp;
-                    {% endif %}
-                </td>
-                <td>
-                    {% if sol.data_devolucao %}
-                        {{ sol.data_devolucao|date:"d/m/Y" }}
+                    {% if sol.devolucao_pendente %}
+                        {{ sol.data_devolucao|date:"d/m/Y"|default:"A marcar" }}
                     {% else %}
                         N/A
                     {% endif %}
                 </td>
+                <td>{{ sol.get_tipo_display|default:"&nbsp;" }}</td>
                 <td>
-                    {% if sol.devolucao_pendente %}
-                        {% if sol.devolucao_realizada %}
-                            <span class="status-ok">Reposição Concluída</span>
-                        {% else %}
-                            <span class="status-devendo">Devendo Carga Horária</span>
-                        {% endif %}
+                    {% if sol.data_aplicacao > hoje %}
+                        Agendada (Futura)
+                    {% elif sol.aplicacao_realizada %}
+                        Validada (Ocorreu)
                     {% else %}
-                        <span class="status-ok">Permuta Direta (Resolvido)</span>
+                        Aguardando Validação
                     {% endif %}
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5">Nenhum histórico validado até o momento.</td>
+                <td colspan="7">Nenhuma solicitação aprovada para este mês.</td>
             </tr>
             {% endfor %}
         </tbody>
