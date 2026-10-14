@@ -104,15 +104,35 @@
         <tbody>
             {% for sol in solicitacoes %}
             <tr>
-                <td>{{ sol.data_aplicacao|date:"d/m/Y" }}</td>
-                <td>{{ sol.aula_origem.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_origem.horario.hora_fim|time:"H:i" }}</td>
-                <td>{{ sol.aula_origem.turma.nome }}</td>
-                <td>{{ sol.aula_destino.disciplina.nome|default:sol.disciplina_substituta.nome|default:"&nbsp;" }}</td>
+                <td>{{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }}</td>
+                <td>
+                    {% if sol.aula_origem %}
+                        {{ sol.aula_origem.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_origem.horario.hora_fim|time:"H:i" }}
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.aula_origem %}
+                        {{ sol.aula_origem.turma.nome|default:"&nbsp;" }}
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.tipo == 'P' and sol.aula_destino and sol.aula_destino.disciplina %}
+                        {{ sol.aula_destino.disciplina.nome }}
+                    {% elif sol.tipo != 'P' and sol.disciplina_substituta %}
+                        {{ sol.disciplina_substituta.nome }}
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </td>
                 <td>
                     {% if sol.tipo == 'P' and sol.aula_destino %}
-                        {{ sol.aula_destino.nomes_professores|default:"&nbsp;" }}
-                    {% elif sol.professor_substituto %}
-                        {{ sol.professor_substituto.nome_completo|default:"&nbsp;" }}
+                        {{ sol.aula_destino.nomes_professores }}
+                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
+                        {{ sol.professor_substituto.nome_completo }}
                     {% else %}
                         &nbsp;
                     {% endif %}
@@ -142,7 +162,13 @@
                     <td>{{ sol.data_devolucao|date:"d/m/Y"|default:"&nbsp;" }}</td>
                     <td>{{ sol.aula_destino.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_destino.horario.hora_fim|time:"H:i" }}</td>
                     <td>{{ sol.aula_destino.turma.nome|default:"&nbsp;" }}</td>
-                    <td>{{ sol.aula_origem.disciplina.nome |default:"&nbsp;" }}</td>
+                    <td>
+                        {% if sol.aula_origem and sol.aula_origem.disciplina %}
+                            {{ sol.aula_origem.disciplina.nome }}
+                        {% else %}
+                            &nbsp;
+                        {% endif %}
+                    </td>
                     <td>{{ sol.aula_destino.nomes_professores|default:"&nbsp;" }}</td>
                 </tr>
                 {% endif %}
