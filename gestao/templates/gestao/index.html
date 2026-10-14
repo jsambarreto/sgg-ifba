@@ -75,10 +75,16 @@
     </a>
     {% endif %}
 
-    {% if user.professor and user.professor.is_diretor %}
+    {% if user.professor and user.professor.is_diretor or request.user.professor.is_coordenador %}
     <a href="{% url 'relatorio_carga_horaria' %}" class="card-atalho border-direcao">
         <h3>📊 Carga Horária Docente</h3>
         <p>Monitore o volume de aulas atribuídas a cada professor no semestre letivo.</p>
+    </a>
+    {% endif %}
+    {% if user.professor and user.professor.is_diretor or request.user.professor.is_coordenador %}
+    <a href="{% url 'relatorio_gerencial' %}" class="card-atalho border-direcao">
+        <h3>📋 Relatório Gerencial</h3>
+        <p>Acompanhe as permutas executadas e gerencie a carga horária devida dos professores.</p>
     </a>
     {% endif %}
 </div>
