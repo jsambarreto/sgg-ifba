@@ -1,0 +1,32 @@
+name: Build and Push Docker Image
+
+# Define quando a automação vai rodar
+on:
+  push:
+    branches:
+      - main # Mude para 'master' se a sua branch principal tiver esse nome
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest # O servidor que o GitHub vai emprestar para rodar
+
+    steps:
+      # Passo 1: Baixa o código do seu repositório para o servidor do GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Passo 2: Faz login no Docker Hub usando os secrets configurados
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Passo 3: Faz o build do Dockerfile e o push para o Docker Hub
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # Altere 'seu_usuario' para o seu username do Docker Hub
+          tags: jsambarreto/sgg-ifba:latest
