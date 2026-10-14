@@ -62,16 +62,19 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if sol.tipo == 'P' and sol.aula_destino %}
-                        {% for prof in sol.aula_destino.professores.all %}
-                            {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
-                        {% empty %}
-                            &nbsp;
-                        {% endfor %}
-                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
-                        {{ sol.professor_substituto.nome_completo }}
+                    {% if sol.status == 'P' %}
+                        <span style="color: #d39e00;">Pendente de Aprovação</span>
+                    {% elif sol.status == 'R' %}
+                        <span style="color: #dc3545;">Rejeitada</span>
                     {% else %}
-                        &nbsp;
+                        <!-- Se for Aprovada ('A'), verificamos a execução -->
+                        {% if sol.data_aplicacao > hoje %}
+                            Agendada (Futura)
+                        {% elif sol.aplicacao_realizada %}
+                            <span style="color: #28a745;">Validada (Ocorreu)</span>
+                        {% else %}
+                            Aguardando Confirmação
+                        {% endif %}
                     {% endif %}
                 </td>
                 <td>

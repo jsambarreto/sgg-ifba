@@ -857,20 +857,23 @@ def gerar_pdf_relatorio_gerencial(request):
     }
     
     # Busca todas as solicitações já aprovadas pela coordenação
-    solicitacoes_aprovadas = Solicitacao.objects.filter(status='A')
+    solicitacoes = Solicitacao.objects.filter(
+        data_aplicacao__gte=data_inicio,
+        data_aplicacao__lte=data_fim
+    ).order_by('data_aplicacao')
     
     # Separa em Pendentes de Validação (aplicação_realizada = False) e Validadas (True)
-    pendentes = solicitacoes_aprovadas.filter(aplicacao_realizada=False).order_by('data_aplicacao')
-    validadas = solicitacoes_aprovadas.filter(aplicacao_realizada=True).order_by('-data_aplicacao')
+    #pendentes = solicitacoes_aprovadas.filter(aplicacao_realizada=False).order_by('data_aplicacao')
+    #validadas = solicitacoes_aprovadas.filter(aplicacao_realizada=True).order_by('-data_aplicacao')
     
-    context = {
-        'pendentes': pendentes,
-        'validadas': validadas,
-        'total_pendentes': pendentes.count(),
-        'total_validadas': validadas.count(),
-        'data_geracao': timezone.now(),
-        'request': request, # Passa o request para podermos acessar o usuário no template
-    }
+    #context = {
+    #    'pendentes': pendentes,
+    #    'validadas': validadas,
+    #    'total_pendentes': pendentes.count(),
+    #    'total_validadas': validadas.count(),
+    #    'data_geracao': timezone.now(),
+    #    'request': request, # Passa o request para podermos acessar o usuário no template
+    #}
     
     html = render_to_string('gestao/pdf_relatorio_gerencial.html', context)
     response = HttpResponse(content_type='application/pdf')
