@@ -110,9 +110,9 @@
                 <td>{{ sol.aula_destino.disciplina.nome|default:"&nbsp;" }}</td>
                 <td>
                     {% if sol.tipo == 'P' and sol.aula_destino %}
-                        {{ sol.aula_destino.professor.nome_completo }}
+                        {{ sol.aula_destino.professor_substituto.nome_completo|default:"&nbsp;" }}
                     {% elif sol.professor_substituto %}
-                        {{ sol.professor_substituto.nome_completo }}
+                        {{ sol.professor_substituto.nome_completo|default:"&nbsp;" }}
                     {% else %}
                         -
                     {% endif %}
@@ -139,11 +139,11 @@
             {% for sol in solicitacoes %}
                 {% if sol.tipo == 'P' and sol.aula_destino %}
                 <tr>
-                    <td>{{ sol.aula_destino.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }}</td>
+                    <td>{{ sol.aula_destino.data_devolucao|date:"d/m/Y"|default:"&nbsp;" }}</td>
                     <td>{{ sol.aula_destino.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_destino.horario.hora_fim|time:"H:i" }}</td>
-                    <td>{{ sol.aula_destino.turma.nome }}</td>
+                    <td>{{ sol.aula_destino.turma.nome|default:"&nbsp;" }}</td>
                     <td>{{ sol.aula_origem.disciplina.nome |default:"&nbsp;" }}</td>
-                    <td>{{ sol.aula_destino.professor.nome_completo }}</td>
+                    <td>{{ sol.aula_destino.professor_substituto.nome_completo }}</td>
                 </tr>
                 {% endif %}
             {% endfor %}
