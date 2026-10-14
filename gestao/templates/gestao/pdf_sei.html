@@ -130,7 +130,11 @@
                 </td>
                 <td>
                     {% if sol.tipo == 'P' and sol.aula_destino %}
-                        {{ sol.aula_destino.nomes_professores }}
+                        {% for prof in sol.aula_destino.professores.all %}
+                            {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
+                        {% empty %}
+                            &nbsp;
+                        {% endfor %}
                     {% elif sol.tipo != 'P' and sol.professor_substituto %}
                         {{ sol.professor_substituto.nome_completo }}
                     {% else %}
@@ -169,7 +173,13 @@
                             &nbsp;
                         {% endif %}
                     </td>
-                    <td>{{ sol.aula_destino.nomes_professores|default:"&nbsp;" }}</td>
+                    <td>
+                        {% for prof in sol.aula_destino.professores.all %}
+                            {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
+                        {% empty %}
+                            &nbsp;
+                        {% endfor %}
+                    </td>
                 </tr>
                 {% endif %}
             {% endfor %}
