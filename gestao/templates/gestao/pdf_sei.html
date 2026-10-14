@@ -107,7 +107,7 @@
                 <td>{{ sol.data_aplicacao|date:"d/m/Y" }}</td>
                 <td>{{ sol.aula_origem.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_origem.horario.hora_fim|time:"H:i" }}</td>
                 <td>{{ sol.aula_origem.turma.nome }}</td>
-                <td>{{ sol.aula_origem.disciplina.nome }}</td>
+                <td>{{ sol.aula_destino.disciplina.nome }}</td>
                 <td>
                     {% if sol.tipo == 'P' and sol.aula_destino %}
                         {{ sol.aula_destino.professor.nome_completo }}
@@ -139,10 +139,10 @@
             {% for sol in solicitacoes %}
                 {% if sol.tipo == 'P' and sol.aula_destino %}
                 <tr>
-                    <td>A combinar / Ref. SGG</td> 
+                    <td>{{ sol.aula_destino.data_aplicacao|date:"d/m/Y" }}</td>
                     <td>{{ sol.aula_destino.horario.hora_inicio|time:"H:i" }} às {{ sol.aula_destino.horario.hora_fim|time:"H:i" }}</td>
                     <td>{{ sol.aula_destino.turma.nome }}</td>
-                    <td>{{ sol.aula_destino.disciplina.nome }}</td>
+                    <td>{{ sol.aula_origem.disciplina.nome }}</td>
                     <td>{{ sol.aula_destino.professor.nome_completo }}</td>
                 </tr>
                 {% endif %}
