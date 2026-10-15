@@ -92,7 +92,7 @@
                         {% if sol.data_aplicacao > hoje %}
                             {{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }} Agendada (Futura)
                         {% elif sol.aplicacao_realizada %}
-                            {{ sol.aplicacao_realizada|date:"d/m/Y"|default:"&nbsp;" }} <span style="color: #28a745;">Validada (Ocorreu)</span>
+                            <span style="color: #28a745;">{{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }} Validada (Ocorreu)</span>
                         {% else %}
                             Aguardando Confirmação
                         {% endif %}
