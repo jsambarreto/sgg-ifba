@@ -1,57 +1,59 @@
 {% extends 'gestao/base.html' %}
 
 {% block content %}
-<div class="container-fluid mt-4 mb-5">
+<div class="container mt-4 mb-5">
     
-    <div class="card mb-4 shadow-sm">
-    <div class="card-body bg-light">
-        <form method="GET" action="{% url 'gerar_pdf_relatorio_gerencial' %}" class="row align-items-center">
-            <div class="col-auto">
-                <label for="mes" class="col-form-label">Filtrar por Mês:</label>
-            </div>
-            <div class="col-auto">
-                <select name="mes" id="mes" class="form-select">
-                    <option value="1">Janeiro</option>
-                    <option value="2">Fevereiro</option>
-                    <option value="3">Março</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Maio</option>
-                    <option value="6">Junho</option>
-                    <option value="7">Julho</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Setembro</option>
-                    <option value="10" selected>Outubro</option>
-                    <option value="11">Novembro</option>
-                    <option value="12">Dezembro</option>
-                </select>
-            </div>
-            <div class="col-auto">
-                <input type="number" name="ano" class="form-control" value="2026" style="width: 100px;">
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary" target="_blank">
-                    📄 Gerar Relatório PDF Mensal
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
+    <!-- Cabeçalho com Título e Botão de Imprimir -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Relatório Gerencial de Permutas e Frequência</h2>
-        <a href="{% url 'gerar_pdf_relatorio_gerencial' %}" target="_blank" class="btn btn-outline-dark shadow-sm">
+        <h2><i class="fas fa-chart-bar"></i> Relatório Gerencial de Permutas</h2>
+        <a href="{% url 'gerar_pdf_relatorio_gerencial' %}?mes={{ request.GET.mes|default:'10' }}&ano={{ request.GET.ano|default:'2026' }}" target="_blank" class="btn btn-outline-dark shadow-sm">
             📄 Imprimir Relatório PDF
         </a>
     </div>
+
+    <!-- Filtro de Busca -->
+    <div class="card mb-4 shadow-sm" style="border-top: 4px solid #007bff;">
+        <div class="card-body bg-light py-3">
+            <form method="GET" action="{% url 'relatorio_gerencial' %}" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label for="mes" class="col-form-label fw-bold">Filtrar por Período:</label>
+                </div>
+                <div class="col-auto">
+                    <select name="mes" id="mes" class="form-select shadow-sm">
+                        <option value="1" {% if request.GET.mes == '1' %}selected{% endif %}>Janeiro</option>
+                        <option value="2" {% if request.GET.mes == '2' %}selected{% endif %}>Fevereiro</option>
+                        <option value="3" {% if request.GET.mes == '3' %}selected{% endif %}>Março</option>
+                        <option value="4" {% if request.GET.mes == '4' %}selected{% endif %}>Abril</option>
+                        <option value="5" {% if request.GET.mes == '5' %}selected{% endif %}>Maio</option>
+                        <option value="6" {% if request.GET.mes == '6' %}selected{% endif %}>Junho</option>
+                        <option value="7" {% if request.GET.mes == '7' %}selected{% endif %}>Julho</option>
+                        <option value="8" {% if request.GET.mes == '8' %}selected{% endif %}>Agosto</option>
+                        <option value="9" {% if request.GET.mes == '9' %}selected{% endif %}>Setembro</option>
+                        <option value="10" {% if request.GET.mes == '10' or not request.GET.mes %}selected{% endif %}>Outubro</option>
+                        <option value="11" {% if request.GET.mes == '11' %}selected{% endif %}>Novembro</option>
+                        <option value="12" {% if request.GET.mes == '12' %}selected{% endif %}>Dezembro</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <input type="number" name="ano" class="form-control shadow-sm" value="{{ request.GET.ano|default:'2026' }}" style="width: 100px;">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary shadow-sm">
+                        🔍 Atualizar Visão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <!-- BLOCO 1: PENDENTES DE VALIDAÇÃO -->
-    <div class="card shadow-sm mb-5 border-warning">
-        <div class="card-header bg-warning text-dark font-weight-bold">
+    <div class="card shadow-sm mb-5" style="border: 1px solid #ffc107;">
+        <div class="card-header text-dark font-weight-bold" style="background-color: #ffeeba;">
             <h5 class="mb-0">Aulas Passadas Pendentes de Confirmação</h5>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th class="px-4">Data Planejada</th>
@@ -95,18 +97,18 @@
     </div>
 
     <!-- BLOCO 2: CARGA HORÁRIA DEVIDA -->
-    <div class="card shadow-sm border-danger">
-        <div class="card-header bg-danger text-white font-weight-bold">
+    <div class="card shadow-sm" style="border: 1px solid #dc3545;">
+        <div class="card-header text-white font-weight-bold" style="background-color: #dc3545;">
             <h5 class="mb-0">Carga Horária Devida (Débitos Pendentes)</h5>
         </div>
-        <div class="card-body bg-light border-bottom">
+        <div class="card-body bg-light border-bottom py-2">
             <p class="text-muted mb-0">
                 <small>Professores que se ausentaram (sem permuta casada) e ainda precisam repor a carga horária.</small>
             </p>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th class="px-4">Professor Devedor</th>
@@ -126,7 +128,7 @@
                                 {% if sol.data_devolucao %}
                                     <span class="badge bg-info text-dark" style="font-size: 0.85rem;">{{ sol.data_devolucao|date:"d/m/Y" }}</span>
                                 {% else %}
-                                    <span class="text-muted fst-italic">Ainda não marcada</span>
+                                    <span class="text-muted" style="font-style: italic;">Ainda não marcada</span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
