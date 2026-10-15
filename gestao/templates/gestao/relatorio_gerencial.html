@@ -1,12 +1,12 @@
 {% extends 'gestao/base.html' %}
 
 {% block content %}
-<div class="container mt-4 mb-5">
+<div class="container-fluid mt-4 mb-5">
     
-    <!-- Cabeçalho com Título e Botão de Imprimir -->
+    <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-chart-bar"></i> Relatório Gerencial de Permutas</h2>
-        <a href="{% url 'gerar_pdf_relatorio_gerencial' %}?mes={{ request.GET.mes|default:'10' }}&ano={{ request.GET.ano|default:'2026' }}" target="_blank" class="btn btn-outline-dark shadow-sm">
+        <a href="{% url 'gerar_pdf_relatorio_gerencial' %}?mes={{ request.GET.mes|default:mes_atual }}&ano={{ request.GET.ano|default:ano_atual }}" target="_blank" class="btn btn-outline-dark shadow-sm">
             📄 Imprimir Relatório PDF
         </a>
     </div>
@@ -20,22 +20,22 @@
                 </div>
                 <div class="col-auto">
                     <select name="mes" id="mes" class="form-select shadow-sm">
-                        <option value="1" {% if request.GET.mes == '1' %}selected{% endif %}>Janeiro</option>
-                        <option value="2" {% if request.GET.mes == '2' %}selected{% endif %}>Fevereiro</option>
-                        <option value="3" {% if request.GET.mes == '3' %}selected{% endif %}>Março</option>
-                        <option value="4" {% if request.GET.mes == '4' %}selected{% endif %}>Abril</option>
-                        <option value="5" {% if request.GET.mes == '5' %}selected{% endif %}>Maio</option>
-                        <option value="6" {% if request.GET.mes == '6' %}selected{% endif %}>Junho</option>
-                        <option value="7" {% if request.GET.mes == '7' %}selected{% endif %}>Julho</option>
-                        <option value="8" {% if request.GET.mes == '8' %}selected{% endif %}>Agosto</option>
-                        <option value="9" {% if request.GET.mes == '9' %}selected{% endif %}>Setembro</option>
-                        <option value="10" {% if request.GET.mes == '10' or not request.GET.mes %}selected{% endif %}>Outubro</option>
-                        <option value="11" {% if request.GET.mes == '11' %}selected{% endif %}>Novembro</option>
-                        <option value="12" {% if request.GET.mes == '12' %}selected{% endif %}>Dezembro</option>
+                        <option value="1" {% if mes_atual == 1 %}selected{% endif %}>Janeiro</option>
+                        <option value="2" {% if mes_atual == 2 %}selected{% endif %}>Fevereiro</option>
+                        <option value="3" {% if mes_atual == 3 %}selected{% endif %}>Março</option>
+                        <option value="4" {% if mes_atual == 4 %}selected{% endif %}>Abril</option>
+                        <option value="5" {% if mes_atual == 5 %}selected{% endif %}>Maio</option>
+                        <option value="6" {% if mes_atual == 6 %}selected{% endif %}>Junho</option>
+                        <option value="7" {% if mes_atual == 7 %}selected{% endif %}>Julho</option>
+                        <option value="8" {% if mes_atual == 8 %}selected{% endif %}>Agosto</option>
+                        <option value="9" {% if mes_atual == 9 %}selected{% endif %}>Setembro</option>
+                        <option value="10" {% if mes_atual == 10 %}selected{% endif %}>Outubro</option>
+                        <option value="11" {% if mes_atual == 11 %}selected{% endif %}>Novembro</option>
+                        <option value="12" {% if mes_atual == 12 %}selected{% endif %}>Dezembro</option>
                     </select>
                 </div>
                 <div class="col-auto">
-                    <input type="number" name="ano" class="form-control shadow-sm" value="{{ request.GET.ano|default:'2026' }}" style="width: 100px;">
+                    <input type="number" name="ano" class="form-control shadow-sm" value="{{ ano_atual }}" style="width: 100px;">
                 </div>
                 <div class="col-auto">
                     <button type="submit" class="btn btn-primary shadow-sm">
@@ -45,112 +45,144 @@
             </form>
         </div>
     </div>
-    
-    <!-- BLOCO 1: PENDENTES DE VALIDAÇÃO -->
-    <div class="card shadow-sm mb-5" style="border: 1px solid #ffc107;">
-        <div class="card-header text-dark font-weight-bold" style="background-color: #ffeeba;">
-            <h5 class="mb-0">Aulas Passadas Pendentes de Confirmação</h5>
+
+    <!-- BLOCO 1: EXTRATO GERAL (TODAS AS MOVIMENTAÇÕES) -->
+    <div class="card shadow-sm mb-5 border-info">
+        <div class="card-header bg-info text-white font-weight-bold">
+            <h5 class="mb-0">Extrato Geral de Movimentações (Mês {{ mes_atual|stringformat:"02d" }}/{{ ano_atual }})</h5>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover table-striped mb-0 align-middle" style="font-size: 0.9rem;">
                     <thead class="table-light">
                         <tr>
-                            <th class="px-4">Data Planejada</th>
+                            <th class="px-3">Data</th>
                             <th>Professor Ausente</th>
+                            <th>Disciplina Afetada</th>
+                            <th>Tipo de Ajuste</th>
                             <th>Substituto / Destino</th>
-                            <th class="text-center">Ação</th>
+                            <th>Situação</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for sol in pendentes_validacao %}
+                        {% for sol in todas_solicitacoes %}
                         <tr>
-                            <td class="px-4"><strong>{{ sol.data_aplicacao|date:"d/m/Y" }}</strong></td>
+                            <td class="px-3"><strong>{{ sol.data_aplicacao|date:"d/m/Y" }}</strong></td>
                             <td>{{ sol.solicitante.nome_completo }}</td>
                             <td>
-                                {% if sol.tipo == 'P' %}
-                                    {{ sol.aula_destino.nomes_professores }}
+                                {% if sol.aula_origem and sol.aula_origem.disciplina %}
+                                    {{ sol.aula_origem.disciplina.nome }}<br>
+                                    <small class="text-muted">{{ sol.aula_origem.turma.nome }}</small>
                                 {% else %}
-                                    {{ sol.professor_substituto.nome_completo|default:"Sem substituto" }}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td class="text-center">
-                                <form action="{% url 'confirmar_execucao' sol.id 'aplicacao' %}" method="POST" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-success shadow-sm">
-                                        ✓ Confirmar Ocorrência
-                                    </button>
-                                </form>
+                            <td><span class="badge bg-secondary">{{ sol.get_tipo_display }}</span></td>
+                            <td>
+                                {% if sol.tipo == 'P' and sol.aula_destino %}
+                                    {% for prof in sol.aula_destino.professores.all %}
+                                        {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
+                                    {% empty %}
+                                        <span class="text-muted">-</span>
+                                    {% endfor %}
+                                {% elif sol.tipo != 'P' and sol.professor_substituto %}
+                                    {{ sol.professor_substituto.nome_completo }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if sol.status == 'P' %}
+                                    <span class="text-warning fw-bold"><i class="fas fa-clock"></i> Pendente Aprovação</span>
+                                {% elif sol.status == 'R' %}
+                                    <span class="text-danger fw-bold"><i class="fas fa-times-circle"></i> Rejeitada</span>
+                                {% else %}
+                                    {% if sol.data_aplicacao > hoje %}
+                                        <span class="text-primary fw-bold">Agendada</span>
+                                    {% elif sol.aplicacao_realizada %}
+                                        <span class="text-success fw-bold"><i class="fas fa-check-circle"></i> Ocorrência Validada</span>
+                                    {% else %}
+                                        <span class="text-warning fw-bold">Aguardando Validação</span>
+                                    {% endif %}
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center py-4 text-muted">
-                                <em>Nenhuma aula pendente de validação no momento.</em>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                <em>Nenhuma solicitação registrada para este mês.</em>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- BLOCO 2: PENDENTES DE VALIDAÇÃO (Ação) -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark font-weight-bold">
+                    <h6 class="mb-0">Validar Ocorrência de Faltas Passadas</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle" style="font-size: 0.85rem;">
+                            <tbody>
+                                {% for sol in pendentes_validacao %}
+                                <tr>
+                                    <td class="px-3"><strong>{{ sol.data_aplicacao|date:"d/m" }}</strong></td>
+                                    <td>{{ sol.solicitante.nome_completo }}</td>
+                                    <td class="text-center">
+                                        <form action="{% url 'confirmar_execucao' sol.id 'aplicacao' %}" method="POST" class="m-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-success shadow-sm">Confirmar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center py-3 text-muted"><em>Tudo validado.</em></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOCO 3: CARGA HORÁRIA DEVIDA (Ação) -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm border-danger">
+                <div class="card-header bg-danger text-white font-weight-bold">
+                    <h6 class="mb-0">Carga Horária Devida (Débitos)</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle" style="font-size: 0.85rem;">
+                            <tbody>
+                                {% for sol in carga_devida %}
+                                <tr>
+                                    <td class="px-3 text-danger"><strong>{{ sol.solicitante.nome_completo }}</strong></td>
+                                    <td>Falta: {{ sol.data_aplicacao|date:"d/m" }}</td>
+                                    <td class="text-center">
+                                        <form action="{% url 'confirmar_execucao' sol.id 'devolucao' %}" method="POST" class="m-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Marcar Reposta</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center py-3 text-muted"><em>Nenhum débito pendente.</em></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- BLOCO 2: CARGA HORÁRIA DEVIDA -->
-    <div class="card shadow-sm" style="border: 1px solid #dc3545;">
-        <div class="card-header text-white font-weight-bold" style="background-color: #dc3545;">
-            <h5 class="mb-0">Carga Horária Devida (Débitos Pendentes)</h5>
-        </div>
-        <div class="card-body bg-light border-bottom py-2">
-            <p class="text-muted mb-0">
-                <small>Professores que se ausentaram (sem permuta casada) e ainda precisam repor a carga horária.</small>
-            </p>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="px-4">Professor Devedor</th>
-                            <th>Data da Falta Original</th>
-                            <th>Disciplina</th>
-                            <th>Data Combinada Reposição</th>
-                            <th class="text-center">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for sol in carga_devida %}
-                        <tr>
-                            <td class="px-4 text-danger"><strong>{{ sol.solicitante.nome_completo }}</strong></td>
-                            <td>{{ sol.data_aplicacao|date:"d/m/Y" }}</td>
-                            <td>{{ sol.aula_origem.disciplina.nome }}</td>
-                            <td>
-                                {% if sol.data_devolucao %}
-                                    <span class="badge bg-info text-dark" style="font-size: 0.85rem;">{{ sol.data_devolucao|date:"d/m/Y" }}</span>
-                                {% else %}
-                                    <span class="text-muted" style="font-style: italic;">Ainda não marcada</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                <form action="{% url 'confirmar_execucao' sol.id 'devolucao' %}" method="POST" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        Marcar Reposição Concluída
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                <em>Nenhum débito de carga horária no momento.</em>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}

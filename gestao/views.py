@@ -766,37 +766,35 @@ def editar_solicitacao(request, id):
 
 @login_required
 def relatorio_gerencial(request):
-    # Trava de segurança: apenas coordenadores ou diretores acessam
     if not (request.user.professor.is_coordenador or request.user.professor.is_diretor):
         return HttpResponseForbidden("Acesso restrito à gestão de ensino.")
 
     hoje = timezone.now().date()
+    mes = int(request.GET.get('mes', hoje.month))
+    ano = int(request.GET.get('ano', hoje.year))
 
-    # 1. Agendadas (Futuras): Aprovadas e com data de aplicação para hoje ou futuro
-    agendadas = Solicitacao.objects.filter(
-        status='A', 
-        data_aplicacao__gte=hoje
+    # Calcula o período do mês
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    data_inicio = timezone.datetime(ano, mes, 1).date()
+    data_fim = timezone.datetime(ano, mes, ultimo_dia).date()
+
+    # Busca TODAS as solicitações do mês selecionado (sem filtrar por status)
+    todas_solicitacoes = Solicitacao.objects.filter(
+        data_aplicacao__gte=data_inicio,
+        data_aplicacao__lte=data_fim
     ).order_by('data_aplicacao')
 
-    # 2. Pendentes de Validação (Passadas): Já passaram da data, mas o coordenador não deu "ok"
-    pendentes_validacao = Solicitacao.objects.filter(
-        status='A', 
-        data_aplicacao__lt=hoje, 
-        aplicacao_realizada=False
-    ).order_by('data_aplicacao')
-
-    # 3. Carga Horária Devida (Ausências sem permuta ou sem reposição validada)
-    # Traz tudo que foi marcado como devolucao_pendente=True, mas que ainda não teve a devolucao_realizada=True
-    carga_devida = Solicitacao.objects.filter(
-        status='A', 
-        devolucao_pendente=True, 
-        devolucao_realizada=False
-    ).order_by('data_aplicacao')
+    # Filtra as pendências que exigem ação do coordenador
+    pendentes_validacao = todas_solicitacoes.filter(status='A', data_aplicacao__lt=hoje, aplicacao_realizada=False)
+    carga_devida = todas_solicitacoes.filter(status='A', devolucao_pendente=True, devolucao_realizada=False)
 
     context = {
-        'agendadas': agendadas,
+        'todas_solicitacoes': todas_solicitacoes,
         'pendentes_validacao': pendentes_validacao,
         'carga_devida': carga_devida,
+        'mes_atual': mes,
+        'ano_atual': ano,
+        'hoje': hoje,
     }
     return render(request, 'gestao/relatorio_gerencial.html', context)
 
