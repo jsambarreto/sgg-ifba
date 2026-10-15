@@ -62,6 +62,27 @@
                     {% endif %}
                 </td>
                 <td>
+                     {% if sol.tipo == 'P' and sol.aula_destino %}
+                        {% for prof in sol.aula_destino.professores.all %}
+                            {{ prof.nome_completo }}{% if not forloop.last %} / {% endif %}
+                        {% empty %}
+                            &nbsp;
+                        {% endfor %}
+                    {% elif sol.tipo != 'P' and sol.professor_substituto %}
+                        {{ sol.professor_substituto.nome_completo }}
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </td>
+                <td>
+                    {% if sol.devolucao_pendente %}
+                        {{ sol.data_devolucao|date:"d/m/Y"|default:"A marcar" }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>{{ sol.get_tipo_display|default:"&nbsp;" }}</td>
+                <td>
                     {% if sol.status == 'P' %}
                         <span style="color: #d39e00;">Pendente de Aprovação</span>
                     {% elif sol.status == 'R' %}
@@ -75,23 +96,6 @@
                         {% else %}
                             Aguardando Confirmação
                         {% endif %}
-                    {% endif %}
-                </td>
-                <td>
-                    {% if sol.devolucao_pendente %}
-                        {{ sol.data_devolucao|date:"d/m/Y"|default:"A marcar" }}
-                    {% else %}
-                        N/A
-                    {% endif %}
-                </td>
-                <td>{{ sol.get_tipo_display|default:"&nbsp;" }}</td>
-                <td>
-                    {% if sol.data_aplicacao > hoje %}
-                        Agendada (Futura)
-                    {% elif sol.aplicacao_realizada %}
-                        Validada (Ocorreu)
-                    {% else %}
-                        Aguardando Validação
                     {% endif %}
                 </td>
             </tr>
