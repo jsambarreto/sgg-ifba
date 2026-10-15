@@ -90,7 +90,7 @@
                     {% else %}
                         <!-- Se for Aprovada ('A'), verificamos a execução -->
                         {% if sol.data_aplicacao > hoje %}
-                            {{ sol.data_aplicacao }} Agendada (Futura)
+                            {{ sol.data_aplicacao|date:"d/m/Y"|default:"&nbsp;" }} Agendada (Futura)
                         {% elif sol.aplicacao_realizada %}
                             {{ sol.aplicacao_realizada }} <span style="color: #28a745;">Validada (Ocorreu)</span>
                         {% else %}
